@@ -234,7 +234,9 @@ Feishu (飞书通知)
 - ✅ 配置 Git 同步 (misyinhu/trading)
 - ✅ launchd 开机自启
 - ✅ 从 Git 移除 settings.yaml (本地配置保护)
-- ✅ 重构部署脚本 (deploy.sh + setup-remote.sh)
+- ✅ 重构部署脚本 (deploy.sh + deploy-to-remote.sh)
+- ✅ 移除 Git hook（git pull 超时问题）
+- ✅ 使用 SCP + tar 替代 git pull
 
 **技术债务**:
 - ⚠️ ib_insync 环境导入问题 (待修复)
@@ -296,7 +298,7 @@ ensure_venv()  # 自动切换到虚拟环境 Python
 
 ### 经验教训
 
-1. **Git 同步**: 大文件传输使用 tar + scp 比 git clone 更可靠
+1. **Git 同步**: 远程服务器 git pull 经常超时，使用 tar + scp 更可靠
 2. **环境隔离**: 虚拟环境配置必须在脚本层面处理，不能依赖系统 PATH
 3. **日志管理**: launchd 服务需要配置 StandardOutPath/StandardErrorPath
 4. **配置分离**: 敏感信息（settings.yaml）不应提交到 Git
@@ -304,38 +306,40 @@ ensure_venv()  # 自动切换到虚拟环境 Python
    - `init.sh` 用于本地开发环境（详细检查、调试）
    - `scripts/deploy.sh` 用于生产部署（简洁、自动重启服务）
    - 两者职责不同，不应混用
-6. **Git Hook 管理**:
-   - Hook 模板提交到 `scripts/post-merge`
-   - 首次部署通过 `setup-remote.sh` 复制到 `.git/hooks/`
-   - 后续 `git pull` 自动触发部署
+6. **简单优先**: Git hook 增加复杂度，直接 SCP 传输更可靠
 
 ### 部署脚本架构 (2026-02-19)
 
-**文件职责**:
+**最终方案**（简化版）:
 
-| 文件 | 环境 | 用途 |
-|------|------|------|
-| `init.sh` | 本地开发 | 详细检查、调试、显示进度 |
-| `scripts/deploy.sh` | 生产 | 环境修正 + 服务重启 |
-| `scripts/post-merge` | Git Hook | 调用 deploy.sh |
-| `scripts/setup-remote.sh` | 首次部署 | 安装 hook + 首次部署 |
+| 文件 | 运行位置 | 用途 |
+|------|----------|------|
+| `init.sh` | 本地 | 开发环境初始化（详细检查） |
+| `scripts/deploy.sh` | 远程 | 环境修正 + 服务重启 |
+| `scripts/deploy-to-remote.sh` | 本地 | 一键部署（打包+传输+部署） |
 
 **部署流程**:
 
-```
-首次部署:
-  ssh openclaw@100.102.240.31
-  cd ~/.openclaw/workspace/trading
-  ./scripts/setup-remote.sh
+```bash
+# 本地运行（一键部署）
+./scripts/deploy-to-remote.sh
 
-后续更新:
-  git pull  # 自动触发 deploy.sh
+# 脚本内部执行:
+# 1. tar 打包（排除 .git, settings.yaml, AGENTS.md）
+# 2. scp 传输到远程
+# 3. ssh 远程解压并运行 deploy.sh
 ```
 
 **关键决策**:
 - `config/settings.yaml` 从 Git 移除，保护本地配置
+- `AGENTS.md` 仅本地使用，不提交到 Git
 - 每次部署强制重启服务，确保使用最新代码
-- post-merge hook 只在远程环境执行（检测 `/Users/openclaw/trading_env`）
+- 不使用 Git hook，避免 git pull 超时问题
+
+**Git pull 超时问题**:
+- 远程服务器 (macOS 10.15) 通过 Tailscale 访问 GitHub 不稳定
+- 错误: `LibreSSL SSL_connect: SSL_ERROR_SYSCALL in connection to github.com:443`
+- 解决: 使用 SCP 传输替代 git pull
 
 ---
 *创建时间: 2026-02-05*
