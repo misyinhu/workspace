@@ -341,6 +341,11 @@ ensure_venv()  # 自动切换到虚拟环境 Python
 - 错误: `LibreSSL SSL_connect: SSL_ERROR_SYSCALL in connection to github.com:443`
 - 解决: 使用 SCP 传输替代 git pull
 
+**SSH 密钥认证**:
+- 本地生成 ed25519 密钥（无密码）
+- 公钥添加到远程 `~/.ssh/authorized_keys`
+- `deploy-to-remote.sh` 无需密码，更安全可靠
+
 ---
 *创建时间: 2026-02-05*
 *最后更新: 2026-02-19*
