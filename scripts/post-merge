@@ -1,6 +1,0 @@
-#!/bin/bash
-# Git post-merge hook
-# 每次 git pull 后自动执行部署
-
-cd "$(dirname "$0")/../.." || exit 1
-./scripts/deploy.sh

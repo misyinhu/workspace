@@ -205,25 +205,20 @@ if [ "$ENV" = "remote" ]; then
 fi
 
 # =============================================================================
-# 测试环境（可选）
+# 测试环境
 # =============================================================================
 
 print_line
 print_info "🧪 运行基础测试..."
 
-# 测试 1: 配置加载测试
+# 测试 : 配置加载测试
 if $PYTHON_PATH -c "import sys; sys.path.insert(0, '$PROJECT_ROOT'); from config.env_config import get_config; print('配置加载: OK')" 2>/dev/null; then
     print_success "配置系统: 正常"
 else
     print_warning "配置系统: 需要检查"
 fi
 
-# 测试 2: 飞书配置检查
-if [ -f "$PROJECT_ROOT/notify/config/feishu.yaml" ]; then
-    print_success "飞书配置: 存在"
-else
-    print_warning "飞书配置: 不存在"
-fi
+
 
 # =============================================================================
 # 总结

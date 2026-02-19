@@ -1,7 +1,0 @@
-feishu:
-  app_id: "cli_a9f5b420c9f85cca"
-  app_secret: "dD87XinteNoxupSbKimr9qkfQh6MVdAS"
-  api_endpoint: "https://open.feishu.cn/open-apis/im/v1/messages"
-  chat_id: "oc_c662ae6c37140f6daab19c0de30dbfd3"
-  message_type: "text"
-  timeout: 30

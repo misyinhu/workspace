@@ -255,153 +255,29 @@ def execute_command(cmd):
         return str(e)
 
 
-def parse_natural_language_orders(text):
-    """解析自然语言订单"""
-    text_lower = text.lower()
-
-    # 检查是否是已知的查询命令（这些不应该被解析为订单）
-    query_commands = ["mnqmyM", "mnqmym", "mnq_mym", "价差", "spread"]
-    for cmd in query_commands:
-        if cmd.lower() in text_lower:
-            return None, None
-
-    # 检测动作
-    if "买入" in text_lower or "买" in text_lower or "buy" in text_lower:
-        action = "BUY"
-    elif "卖出" in text_lower or "卖" in text_lower or "sell" in text_lower:
-        action = "SELL"
-    elif "平仓" in text_lower or "平掉" in text_lower or "close" in text_lower:
-        action = "CLOSE"
-    else:
-        return None, "未检测到买卖动作"
-
-    # 检测数量
-    quantity = 1
-    numbers = re.findall(r"(\d+)", text)
-    if numbers:
-        quantity = int(numbers[0])
-
-    # 检测品种
-    symbol = None
-    symbols = {
-        "aapl": "AAPL",
-        "苹果": "AAPL",
-        "tsla": "TSLA",
-        "特斯拉": "TSLA",
-        "gc": "GC",
-        "黄金": "GC",
-        "gold": "GC",
-        "mgc": "MGC",
-        "微型黄金": "MGC",
-        "btc": "BTC",
-        "比特币": "BTC",
-        "bitcoin": "BTC",
-        "eth": "ETH",
-        "以太坊": "ETH",
-        "ethereum": "ETH",
-        "myna": "Myna",
-        "myna": "Myna",
-        "mnq": "MNQ",
-        "迷你纳斯达克": "MNQ",
-        "迷你那指": "MNQ",
-        "mym": "MYM",
-        "迷你道琼斯": "MYM",
-        "siv": "SIV",
-        "澳洲200": "SIV",
-        "hsi": "HSI",
-        "恒生指数": "HSI",
-        "nk": "NK",
-        "日经指数": "NK",
-        "xagusd": "XAGUSD",
-    }
-
-    for key, value in symbols.items():
-        if key in text_lower:
-            symbol = value
-            break
-
-    if not symbol:
-        return None, "未识别到交易品种"
-
-    # 检测订单类型
-    if "限价" in text_lower or "lmt" in text_lower:
-        order_type = "LMT"
-        price_match = re.search(r"[限价|LMT|price][:：]?\s*(\d+\.?\d*)", text_lower)
-        limit_price = price_match.group(1) if price_match else None
-    else:
-        order_type = "MKT"
-        limit_price = None
-
-    # 判断证券类型
-    futures = {"GC", "MGC", "MNQ", "MYM", "MES", "ES", "NQ", "YM", "CL", "NG", "ZB", "ZN", "ZF", "6E", "6J", "6B", "6A", "SI", "PL", "PA", "HG", "ZC", "ZS", "ZW", "HE", "LE", "GF", "MHI", "MBT"}
-    if symbol == "XAGUSD":
-        sec_type = "CMDTY"
-    elif symbol in futures:
-        sec_type = "FUT"
-    else:
-        sec_type = "STK"
-
-    # 构建命令
-    python_cmd = get_python_cmd()
-    orders_script = str(Path(PROJECT_ROOT) / "orders" / "place_order.py")
-    if action == "CLOSE":
-        cmd = f"{python_cmd} {orders_script} --symbol {symbol} --sec_type {sec_type} --close_position --order_type {order_type}"
-    else:
-        if limit_price:
-            cmd = f"{python_cmd} {orders_script} --symbol {symbol} --sec_type {sec_type} --action {action} --quantity {quantity} --order_type {order_type} --limit_price {limit_price}"
-        else:
-            cmd = f"{python_cmd} {orders_script} --symbol {symbol} --sec_type {sec_type} --action {action} --quantity {quantity} --order_type {order_type}"
-
-    return cmd, f"{action} {quantity} {symbol} @ {order_type}" + (
-        f" ${limit_price}" if limit_price else ""
-    )
-
-
 def get_help_text():
     """获取帮助文本"""
-    if QUERY_ONLY:
-        return """🔒 **仅查询模式**
+    return """**📊 交易系统命令列表**
 
-**可用命令：**
-
-**监控类:**
-• /status - 查看监控状态
-• /refresh - 立即刷新监控数据
-• /log - 查看日志
-
-**模式切换：**
-• /交易模式 - 切换到交易模式（允许下单）
-• /查询模式 - 切换到仅查询模式
-
-**帮助：**
-• /help - 显示帮助"""
-    else:
-        return """✅ **交易模式**
-
-**查询类 (/命令 或 发文字):**
-• /持仓 或发「持仓」
-• /账户 或发「账户」
-
-**模式切换：**
-• /交易模式 - 切换到交易模式
-• /查询模式 - 切换到仅查询模式
+**查询类:**
+• /持仓 - 查询当前持仓
+• /账户 - 查询账户摘要
+• /订单 - 查询活动订单
+• /成交 - 查询成交记录
 
 **监控类:**
 • /status - 查看监控状态
-• /refresh - 立即刷新监控数据
+• /refresh - 刷新监控数据
 • /start - 启动监控
 • /stop - 停止监控
 • /log - 查看日志
 
-**下单示例 (直接发文字):**
-• 「买入100股AAPL」
-• 「买入1手微型黄金」
-• 「卖出全部TSLA」
-• 「平掉MGC持仓」
-• 「限价买入BTC 210000」
+**模式切换:**
+• /交易模式 - 切换到交易模式
+• /查询模式 - 切换到仅查询模式
 
 **帮助:**
-• /help 或发「帮助」"""
+• /help - 显示此帮助"""
 
 
 def trigger_refresh():
@@ -431,6 +307,7 @@ def trigger_refresh():
 
 
 COMMANDS = {
+    # 监控类
     "status": lambda: get_monitor_status(),
     "refresh": trigger_refresh,
     "start": lambda: start_z120_monitor(),
@@ -438,7 +315,7 @@ COMMANDS = {
     "log": lambda: execute_command(
         "tail -30 /tmp/z120_monitor.log 2>/dev/null || echo 'No log'"
     ),
-    # 模式切换命令
+    # 模式切换
     "交易模式": lambda: (
         set_query_only(False) or globals().__setitem__("QUERY_ONLY", False),
         "✅ **已切换到交易模式**\n\n现在允许查询和下单操作。",
@@ -447,12 +324,18 @@ COMMANDS = {
         set_query_only(True) or globals().__setitem__("QUERY_ONLY", True),
         "🔒 **已切换到仅查询模式**\n\n现在仅允许查询操作，不允许下单。",
     )[1],
-    # IBKR commands
+    # 查询类
     "持仓": lambda: execute_command(
         f"{get_python_cmd()} {Path(PROJECT_ROOT) / 'account' / 'get_positions.py'}"
     ),
     "账户": lambda: execute_command(
         f"{get_python_cmd()} {Path(PROJECT_ROOT) / 'account' / 'get_account_summary.py'}"
+    ),
+    "订单": lambda: execute_command(
+        f"{get_python_cmd()} {Path(PROJECT_ROOT) / 'orders' / 'get_orders.py'}"
+    ),
+    "成交": lambda: execute_command(
+        f"{get_python_cmd()} {Path(PROJECT_ROOT) / 'account' / 'get_trades.py'}"
     ),
     "help": lambda: get_help_text(),
 }
