@@ -332,8 +332,14 @@ def parse_natural_language_orders(text):
         order_type = "MKT"
         limit_price = None
 
-    # XAGUSD 是商品
-    sec_type = "CMDTY" if symbol == "XAGUSD" else "STK"
+    # 判断证券类型
+    futures = {"GC", "MGC", "MNQ", "MYM", "MES", "ES", "NQ", "YM", "CL", "NG", "ZB", "ZN", "ZF", "6E", "6J", "6B", "6A", "SI", "PL", "PA", "HG", "ZC", "ZS", "ZW", "HE", "LE", "GF", "MHI", "MBT"}
+    if symbol == "XAGUSD":
+        sec_type = "CMDTY"
+    elif symbol in futures:
+        sec_type = "FUT"
+    else:
+        sec_type = "STK"
 
     # 构建命令
     python_cmd = get_python_cmd()
