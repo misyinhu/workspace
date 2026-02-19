@@ -175,7 +175,6 @@ launchctl start com.openclaw.webhook
 ### 本地 (macOS)
 ```
 路径: /Users/wang/.opencode/workspace/trading/
-Python: /usr/local/bin/python3
 GitHub: misyinhu/trading
 ```
 
@@ -187,13 +186,6 @@ GitHub: misyinhu/trading
 项目: ~/.openclaw/workspace/trading/
 Webhook: http://100.102.240.31:5002
 ```
-
-### 飞书配置
-```
-App ID: cli_a9f5b420c9f85cca
-Chat ID: oc_7455ec51aff3a187248914f978b834e3
-```
-
 ---
 
 ## 开发规范
