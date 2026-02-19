@@ -112,6 +112,23 @@ else
     print_success "检测到环境: 本地开发"
 fi
 
+# 步骤 5.5: 自动修正环境配置
+print_info "Step 5.5: 验证环境配置"
+SETTINGS_FILE="$PROJECT_ROOT/config/settings.yaml"
+if [ -f "$SETTINGS_FILE" ]; then
+    CURRENT_ENV=$(grep "^current:" "$SETTINGS_FILE" | awk '{print $2}')
+    if [ "$CURRENT_ENV" != "$ENV" ]; then
+        print_warning "配置不匹配: current=$CURRENT_ENV, 实际环境=$ENV"
+        print_info "自动修正配置..."
+        sed -i.bak "s/^current: .*/current: $ENV/" "$SETTINGS_FILE"
+        print_success "已将 current 设置为: $ENV"
+    else
+        print_success "环境配置正确: $ENV"
+    fi
+else
+    print_warning "未找到 settings.yaml"
+fi
+
 # 步骤 6: 检查 Python 环境
 print_info "Step 6: 检查 Python 环境"
 if command -v "$PYTHON_PATH" &> /dev/null; then
