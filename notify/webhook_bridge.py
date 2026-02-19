@@ -19,7 +19,7 @@ import yaml
 # 添加配置路径
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 sys.path.insert(0, PROJECT_ROOT)
-from config import load_config, is_query_only, set_query_only, get_webhook_port
+from config import load_config, is_query_only, set_query_only, get_webhook_port, get_project_root
 
 # 加载主配置
 load_config()
@@ -248,7 +248,7 @@ def execute_command(cmd):
     """执行命令并返回结果"""
     try:
         result = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True, timeout=30
+            cmd, shell=True, capture_output=True, text=True, timeout=30, cwd=get_project_root()
         )
         return result.stdout + result.stderr
     except Exception as e:

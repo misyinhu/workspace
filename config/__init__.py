@@ -104,3 +104,11 @@ def set_query_only(mode: bool):
 def get_webhook_port() -> int:
     """获取 Webhook 端口"""
     return int(get("webhook.port", 5002))
+
+
+def get_project_root() -> str:
+    """获取项目根目录（根据当前环境配置）"""
+    project_root = _get_from_env("project_root")
+    if project_root:
+        return str(project_root)
+    return os.path.dirname(os.path.dirname(__file__))
