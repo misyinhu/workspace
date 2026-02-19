@@ -223,6 +223,23 @@ Feishu (飞书通知)
 - ⚠️ ib_insync 环境导入问题 (待修复)
 - ⚠️ 集成测试框架 (待完善)
 
+### Phase 3: 基础设施升级 (2026-02-19)
+**目标**: 支持长期运行 Agent 工作流
+
+**已完成**:
+- ✅ 部署远程环境 (100.102.240.31)
+- ✅ 创建 feature_list.json (19 功能跟踪)
+- ✅ 创建 AGENTS.md (快速恢复指南，本地)
+- ✅ 创建 init.sh (开发环境初始化)
+- ✅ 配置 Git 同步 (misyinhu/trading)
+- ✅ launchd 开机自启
+- ✅ 从 Git 移除 settings.yaml (本地配置保护)
+- ✅ 重构部署脚本 (deploy.sh + setup-remote.sh)
+
+**技术债务**:
+- ⚠️ ib_insync 环境导入问题 (待修复)
+- ⚠️ 集成测试框架 (待完善)
+
 ### 重要技术发现
 
 #### 1. IB API 外汇持仓查询
@@ -283,6 +300,42 @@ ensure_venv()  # 自动切换到虚拟环境 Python
 2. **环境隔离**: 虚拟环境配置必须在脚本层面处理，不能依赖系统 PATH
 3. **日志管理**: launchd 服务需要配置 StandardOutPath/StandardErrorPath
 4. **配置分离**: 敏感信息（settings.yaml）不应提交到 Git
+5. **部署脚本分离**: 
+   - `init.sh` 用于本地开发环境（详细检查、调试）
+   - `scripts/deploy.sh` 用于生产部署（简洁、自动重启服务）
+   - 两者职责不同，不应混用
+6. **Git Hook 管理**:
+   - Hook 模板提交到 `scripts/post-merge`
+   - 首次部署通过 `setup-remote.sh` 复制到 `.git/hooks/`
+   - 后续 `git pull` 自动触发部署
+
+### 部署脚本架构 (2026-02-19)
+
+**文件职责**:
+
+| 文件 | 环境 | 用途 |
+|------|------|------|
+| `init.sh` | 本地开发 | 详细检查、调试、显示进度 |
+| `scripts/deploy.sh` | 生产 | 环境修正 + 服务重启 |
+| `scripts/post-merge` | Git Hook | 调用 deploy.sh |
+| `scripts/setup-remote.sh` | 首次部署 | 安装 hook + 首次部署 |
+
+**部署流程**:
+
+```
+首次部署:
+  ssh openclaw@100.102.240.31
+  cd ~/.openclaw/workspace/trading
+  ./scripts/setup-remote.sh
+
+后续更新:
+  git pull  # 自动触发 deploy.sh
+```
+
+**关键决策**:
+- `config/settings.yaml` 从 Git 移除，保护本地配置
+- 每次部署强制重启服务，确保使用最新代码
+- post-merge hook 只在远程环境执行（检测 `/Users/openclaw/trading_env`）
 
 ---
 *创建时间: 2026-02-05*
