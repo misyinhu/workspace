@@ -35,9 +35,9 @@ fi
 # 2. 重启 webhook 服务
 echo "[deploy] Step 2: 重启 webhook 服务..."
 launchctl stop com.openclaw.webhook 2>/dev/null || true
-sleep 1
+sleep 2
 launchctl start com.openclaw.webhook
-sleep 3
+sleep 4
 
 # 3. 验证服务状态
 echo "[deploy] Step 3: 验证服务状态..."
