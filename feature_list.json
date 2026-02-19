@@ -1,0 +1,306 @@
+{
+  "project": "Trading System - OpenClaw Integration",
+  "version": "1.0.0",
+  "last_updated": "2026-02-19",
+  "categories": {
+    "core_trading": {
+      "name": "核心交易功能",
+      "features": [
+        {
+          "id": "TRADE-001",
+          "name": "期货下单",
+          "description": "通过 IB Gateway 下单期货合约（GC, MGC, MNQ, MYM 等）",
+          "steps": [
+            "连接 IB Gateway",
+            "选择主力合约",
+            "提交市价/限价单",
+            "确认订单状态",
+            "飞书通知结果"
+          ],
+          "passes": false,
+          "priority": "high",
+          "dependencies": []
+        },
+        {
+          "id": "TRADE-002",
+          "name": "股票下单",
+          "description": "通过 IB Gateway 下单股票（AAPL, TSLA 等）",
+          "steps": [
+            "连接 IB Gateway",
+            "查询股票合约",
+            "提交订单",
+            "确认订单状态",
+            "飞书通知结果"
+          ],
+          "passes": false,
+          "priority": "high",
+          "dependencies": []
+        },
+        {
+          "id": "TRADE-003",
+          "name": "平仓功能",
+          "description": "自动检测持仓方向并平仓",
+          "steps": [
+            "查询当前持仓",
+            "检测持仓方向",
+            "提交反向订单",
+            "确认平仓成功",
+            "飞书通知结果"
+          ],
+          "passes": false,
+          "priority": "high",
+          "dependencies": ["TRADE-001"]
+        },
+        {
+          "id": "TRADE-004",
+          "name": "订单查询",
+          "description": "查询当前活动订单和历史订单",
+          "steps": [
+            "连接 IB Gateway",
+            "获取订单列表",
+            "显示订单详情",
+            "飞书通知"
+          ],
+          "passes": false,
+          "priority": "medium",
+          "dependencies": []
+        },
+        {
+          "id": "TRADE-005",
+          "name": "订单取消",
+          "description": "取消未成交的订单",
+          "steps": [
+            "查询活动订单",
+            "选择要取消的订单",
+            "提交取消请求",
+            "确认取消成功"
+          ],
+          "passes": false,
+          "priority": "medium",
+          "dependencies": ["TRADE-004"]
+        }
+      ]
+    },
+    "account_management": {
+      "name": "账户管理",
+      "features": [
+        {
+          "id": "ACCT-001",
+          "name": "持仓查询",
+          "description": "查询当前账户持仓",
+          "steps": [
+            "连接 IB Gateway",
+            "获取持仓列表",
+            "计算盈亏",
+            "飞书通知持仓"
+          ],
+          "passes": false,
+          "priority": "high",
+          "dependencies": []
+        },
+        {
+          "id": "ACCT-002",
+          "name": "账户摘要",
+          "description": "查询账户余额、购买力等信息",
+          "steps": [
+            "连接 IB Gateway",
+            "获取账户摘要",
+            "解析关键指标",
+            "飞书通知"
+          ],
+          "passes": false,
+          "priority": "medium",
+          "dependencies": []
+        },
+        {
+          "id": "ACCT-003",
+          "name": "成交记录",
+          "description": "查询历史成交记录",
+          "steps": [
+            "连接 IB Gateway",
+            "获取成交记录",
+            "格式化输出",
+            "飞书通知"
+          ],
+          "passes": false,
+          "priority": "low",
+          "dependencies": []
+        }
+      ]
+    },
+    "webhook_integration": {
+      "name": "Webhook 集成",
+      "features": [
+        {
+          "id": "WEB-001",
+          "name": "Webhook 服务启动",
+          "description": "启动 Flask webhook 服务",
+          "steps": [
+            "加载配置",
+            "启动 Flask 服务器",
+            "监听端口 5002",
+            "健康检查通过"
+          ],
+          "passes": true,
+          "priority": "high",
+          "dependencies": [],
+          "notes": "✅ 已实现并部署"
+        },
+        {
+          "id": "WEB-002",
+          "name": "接收飞书命令",
+          "description": "接收并解析飞书聊天命令",
+          "steps": [
+            "接收飞书 webhook",
+            "解析命令文本",
+            "路由到对应处理函数",
+            "返回结果"
+          ],
+          "passes": true,
+          "priority": "high",
+          "dependencies": ["WEB-001"],
+          "notes": "✅ 已实现"
+        },
+        {
+          "id": "WEB-003",
+          "name": "TradingView 信号",
+          "description": "接收 TradingView webhook 信号",
+          "steps": [
+            "接收 TradingView webhook",
+            "解析信号数据",
+            "触发交易",
+            "发送通知"
+          ],
+          "passes": false,
+          "priority": "medium",
+          "dependencies": ["WEB-001", "TRADE-001"]
+        },
+        {
+          "id": "WEB-004",
+          "name": "开机自启",
+          "description": "配置 launchd 开机自启",
+          "steps": [
+            "创建 plist 文件",
+            "配置 launchd",
+            "测试重启",
+            "验证服务启动"
+          ],
+          "passes": true,
+          "priority": "high",
+          "dependencies": ["WEB-001"],
+          "notes": "✅ 已配置"
+        }
+      ]
+    },
+    "environment_config": {
+      "name": "环境配置",
+      "features": [
+        {
+          "id": "ENV-001",
+          "name": "多环境配置",
+          "description": "支持本地和远程环境切换",
+          "steps": [
+            "创建 settings.yaml",
+            "配置 local 环境",
+            "配置 remote 环境",
+            "实现环境检测",
+            "测试环境切换"
+          ],
+          "passes": true,
+          "priority": "high",
+          "dependencies": [],
+          "notes": "✅ 已实现 config/env_config.py"
+        },
+        {
+          "id": "ENV-002",
+          "name": "Git 同步",
+          "description": "本地和远程代码同步",
+          "steps": [
+            "初始化 Git 仓库",
+            "推送到 GitHub",
+            "远程克隆",
+            "配置 .gitignore",
+            "测试同步流程"
+          ],
+          "passes": true,
+          "priority": "high",
+          "dependencies": [],
+          "notes": "✅ 已配置 misyinhu/trading"
+        }
+      ]
+    },
+    "monitoring": {
+      "name": "监控功能",
+      "features": [
+        {
+          "id": "MON-001",
+          "name": "Z120 价差监控",
+          "description": "监控 Z120 价差并发送通知",
+          "steps": [
+            "定时获取价格",
+            "计算价差",
+            "检测阈值",
+            "飞书通知"
+          ],
+          "passes": false,
+          "priority": "medium",
+          "dependencies": ["WEB-001"]
+        },
+        {
+          "id": "MON-002",
+          "name": "服务健康检查",
+          "description": "监控服务状态",
+          "steps": [
+            "定时 ping 服务",
+            "检测异常",
+            "自动重启",
+            "飞书告警"
+          ],
+          "passes": false,
+          "priority": "low",
+          "dependencies": ["WEB-001"]
+        }
+      ]
+    },
+    "testing": {
+      "name": "测试框架",
+      "features": [
+        {
+          "id": "TEST-001",
+          "name": "集成测试",
+          "description": "端到端集成测试",
+          "steps": [
+            "连接测试",
+            "下单测试",
+            "查询测试",
+            "通知测试"
+          ],
+          "passes": false,
+          "priority": "high",
+          "dependencies": []
+        },
+        {
+          "id": "TEST-002",
+          "name": "单元测试",
+          "description": "核心功能单元测试",
+          "steps": [
+            "配置 pytest",
+            "编写测试用例",
+            "运行测试",
+            "生成报告"
+          ],
+          "passes": false,
+          "priority": "medium",
+          "dependencies": []
+        }
+      ]
+    }
+  },
+  "metrics": {
+    "total_features": 19,
+    "completed": 6,
+    "in_progress": 0,
+    "pending": 13,
+    "completion_rate": "31.6%"
+  }
+}
