@@ -1,0 +1,43 @@
+# 交易系统配置文件
+
+# 环境配置（本地开发 vs 远程部署）
+environments:
+  local:
+    python_path: /usr/local/bin/python3
+    project_root: /Users/wang/.opencode/workspace/trading
+    use_venv: false
+    ib_port: 4002
+    feishu:
+      app_id: "cli_a9f5b420c9f85cca"
+      app_secret: "dD87XinteNoxupSbKimr9qkfQh6MVdAS"
+      api_endpoint: "https://open.feishu.cn/open-apis/im/v1/messages"
+      auth_endpoint: "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
+      chat_id: "oc_7455ec51aff3a187248914f978b834e3"
+      message_type: "text"
+      timeout: 30
+    
+  remote:
+    python_path: /Users/openclaw/trading_env/bin/python3
+    project_root: /Users/openclaw/.openclaw/workspace/trading
+    use_venv: true
+    ib_port: 4001
+    feishu:
+      app_id: "cli_a9f5b420c9f85cca"
+      app_secret: "dD87XinteNoxupSbKimr9qkfQh6MVdAS"
+      api_endpoint: "https://open.feishu.cn/open-apis/im/v1/messages"
+      auth_endpoint: "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
+      chat_id: "oc_7455ec51aff3a187248914f978b834e3"
+      message_type: "text"
+      timeout: 30
+
+# 当前环境（默认 local，远程部署时改为 remote）
+current: local
+
+# 模式配置
+# true: 仅查询模式（禁止下单）
+# false: 交易模式（允许下单）
+query_only: true
+
+# Webhook 服务配置
+webhook:
+  port: 5002
