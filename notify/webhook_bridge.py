@@ -10,7 +10,6 @@ import json
 import subprocess
 import time
 import logging
-import re
 from pathlib import Path
 from flask import Flask, request, jsonify
 import requests
@@ -52,15 +51,6 @@ FEISHU_CONVERSATION_ID = feishu_config.get("chat_id", "")
 
 # 仅查询模式
 QUERY_ONLY = is_query_only()
-
-
-def get_mode_text():
-    """获取当前模式状态"""
-    if QUERY_ONLY:
-        return "🔒 **当前模式：仅查询模式**\n\n仅允许查询操作，不允许下单。"
-    else:
-        return "✅ **当前模式：交易模式**\n\n允许查询和下单操作。"
-
 
 _token_cache = {"token": None, "expire": 0}
 Z120_SCRIPT = str(Path(PROJECT_ROOT) / "z120_monitor" / "z120_scheduler.py")
@@ -446,28 +436,8 @@ def feishu_webhook():
                     output = COMMANDS[matched_cmd]()
                     success, resp = send_feishu(f"**{cmd_key}**\n\n{output}", chat_id)
                 else:
-                    # 仅查询模式下不允许下单
-                    if QUERY_ONLY:
-                        send_feishu(
-                            "🔒 **仅查询模式已启用**\n\n当前仅允许查询操作，不允许下单。\n\n可用查询命令：\n• 价差 - 查询价差\n• MNQMYM - 查询 MNQ_MYM\n• /spread - 查询价差\n• /持仓 - 查询持仓\n• /账户 - 查询账户\n\n发送 /help 查看帮助",
-                            chat_id,
-                        )
-                    else:
-                        # 尝试解析订单
-                        logger.info(f"[FEISHU] Trying natural language orders: {text}")
-
-                        cmd, status_msg = parse_natural_language_orders(text)
-
-                        if cmd and status_msg:
-                            logger.info(f"[FEISHU] Parsed command: {cmd}")
-                            send_feishu(f"**{status_msg}**\n\n执行中...", chat_id)
-
-                            output = execute_command(cmd)
-                            logger.info(f"[FEISHU] Order output: {output}")
-                            send_feishu(f"**订单执行结果:**\n\n{output}", chat_id)
-                        else:
-                            # 不是订单命令，显示帮助
-                            send_feishu(get_help_text(), chat_id)
+                    # 未识别的命令，显示帮助
+                    send_feishu(get_help_text(), chat_id)
 
         return jsonify({"status": "ok"}), 200
     except Exception as e:
@@ -521,11 +491,12 @@ if __name__ == "__main__":
     print(f"  健康检查: GET /health")
     print()
     print("命令 (在飞书群发送):")
+    print("  /持仓 - 查询持仓")
+    print("  /账户 - 查询账户")
+    print("  /订单 - 查询订单")
+    print("  /成交 - 查询成交")
     print("  /status - 查看监控状态")
-    print("  /start - 启动监控")
-    print("  /stop - 停止监控")
     print("  /help - 显示帮助")
-    print("  自然语言: 「买入100股AAPL」")
     print("=" * 60)
 
     app.run(host="0.0.0.0", port=port)
