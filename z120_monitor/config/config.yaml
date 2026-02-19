@@ -1,0 +1,14 @@
+# Z120 监控配置
+monitoring:
+  # 调度间隔（分钟）
+  interval_minutes: 5
+  # K线周期
+  bar_size: "5 mins"
+  # Z120 滑动窗口
+  zscore_window: 120
+  # IBKR 连接配置
+  ibkr:
+    host: "127.0.0.1"
+    port: 4001
+    client_id: 0
+    paper_trading: false
