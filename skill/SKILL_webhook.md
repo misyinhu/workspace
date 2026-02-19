@@ -1,85 +1,29 @@
 ---
-name: z120-monitor
-description: Z120价差监控系统，支持多交易对价差监控、飞书通知集成。用于：(1) 启动/停止Z120监控 (2) 查询价差状态 (3) 配置交易对 (4) 接收TradingView webhook信号
+name: trading-commands
+description: 飞书交易命令 - 只支持查询，不支持下单
 ---
 
-# Z120 价差监控
+# 飞书交易命令
 
-## 快速启动
+## 可用命令
 
-### 启动 webhook_bridge 服务
-```bash
-python3 notify/webhook_bridge.py 5002
-```
-
-### 启动 Z120 监控
-```bash
-# 方式1：通过 webhook 命令
-curl http://localhost:5002/webhook -d '{"text": "/start"}'
-
-# 方式2：直接运行
-python3 z120_monitor/z120_scheduler.py
-
-# 方式3：只运行一次
-python3 z120_monitor/z120_scheduler.py --once
-```
-
-## 命令列表
-
-| 命令 | 功能 |
-|------|------|
-| `/status` | 查看监控状态 |
-| `/refresh` | 立即刷新数据 |
-| `/start` | 启动监控 |
-| `/stop` | 停止监控 |
-
-## 配置
-
-### 交易对配置
-文件：`z120_monitor/config/pairs.yaml`
-
-```yaml
-pairs:
-  - name: "MNQ_MYM"
-    mode: "value"
-    threshold: 1000
-    enabled: true
-    assets:
-      - symbol: "MNQ"
-        exchange: "CME"
-        sec_type: "FUT"
-        multiplier: 2.0
-        ratio1: 1
-      - symbol: "MYM"
-        exchange: "CME"
-        sec_type: "FUT"
-        multiplier: 0.5
-        ratio2: 2
-```
-
-### 价差计算
-- **价值价差**：spread = price1 × multiplier1 × ratio1 − price2 × multiplier2 × ratio2
-- **价差比率**：spread = (price1 × multiplier1 × ratio1) / (price2 × multiplier2 × ratio2)
-
-## 端点
-
-| 端点 | 方法 | 说明 |
+| 命令 | 功能 | 示例 |
 |------|------|------|
-| `/webhook` | POST | 接收 TradingView webhook |
-| `/test-api` | POST | 测试 Feishu API |
-| `/health` | GET | 健康检查 |
+| /持仓 | 查询当前持仓 | /持仓 |
+| /账户 | 账户摘要 | /账户 |
+| /订单 | 活动订单 | /订单 |
+| /成交 | 成交记录 | /成交 |
+| /status | 监控状态 | /status |
+| /start | 启动监控 | /start |
+| /stop | 停止监控 | /stop |
+| /refresh | 刷新数据 | /refresh |
+| /log | 查看日志 | /log |
+| /交易模式 | 切换到交易模式 | /交易模式 |
+| /查询模式 | 切换到查询模式 | /查询模式 |
+| /help | 显示帮助 | /help |
 
-## 测试命令
-```bash
-# 健康检查
-curl http://localhost:5002/health
+## 注意事项
 
-# 测试发送
-curl -X POST http://localhost:5002/test-api -H "Content-Type: application/json" -d '{}'
-```
-
-## 相关文件
-- 监控脚本：`z120_monitor/z120_scheduler.py`
-- 缓存管理：`z120_monitor/z120_cache.py`
-- 飞书通知：`notify/feishu.py`
-- 状态数据：`data/z120_status.json`
+- **飞书只支持查询功能**，不支持下单
+- 查询类命令无需参数，直接发送即可
+- 命令不区分大小写，支持中英文
