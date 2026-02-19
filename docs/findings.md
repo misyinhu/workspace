@@ -171,6 +171,119 @@ python3 get_positions.py
 python3 get_account_summary.py
 ```
 
+## 项目历史与里程碑
+
+### Phase 1: 项目启动 (2026-02-05)
+**目标**: 建立外汇交易监控系统基础架构
+
+**已完成**:
+- ✅ 安装 IBKR 交易技能
+- ✅ 安装飞书通知技能
+- ✅ 配置 IB Gateway 连接 (端口 4001)
+- ✅ 配置飞书 API (App ID: cli_a9f5b420c9f85cca)
+
+**关键决策**:
+- 选择 TradingView + Webhook + 飞书的架构
+- 使用 Python + ib_insync 作为交易接口
+
+### Phase 2: Z120 M5 监控系统 (2026-02-15)
+**目标**: 价差监控和自动通知
+
+**已完成**:
+- ✅ 多交易对支持 (MNQ_MYM, HSTECH_MCH, RB_CL)
+- ✅ 实时价差计算
+- ✅ Z120 指标计算（7天历史数据）
+- ✅ 飞书 webhook 集成
+- ✅ 每小时定时监控
+- ✅ 缓存数据管理（7天自动清理）
+
+**技术栈**:
+```
+TradingView (指标计算)
+  ↓
+Webhook Bridge (端口 5002)
+  ↓
+Z120 Scheduler (价差监控)
+  ↓
+Feishu (飞书通知)
+```
+
+### Phase 3: 基础设施升级 (2026-02-19)
+**目标**: 支持长期运行 Agent 工作流
+
+**已完成**:
+- ✅ 部署远程环境 (100.102.240.31)
+- ✅ 创建 feature_list.json (19 功能跟踪)
+- ✅ 创建 AGENTS.md (快速恢复指南)
+- ✅ 创建 init.sh (环境初始化)
+- ✅ 配置 Git 同步 (misyinhu/trading)
+- ✅ launchd 开机自启
+
+**技术债务**:
+- ⚠️ ib_insync 环境导入问题 (待修复)
+- ⚠️ 集成测试框架 (待完善)
+
+### 重要技术发现
+
+#### 1. IB API 外汇持仓查询
+**问题**: 外汇订单成交后，使用 `ib.positions()` 查询不到持仓。
+
+**解决方案**:
+- 使用 `ib.portfolio()` 查询
+- 查询特定外汇合约
+- 检查 `accountSummary()` 中的 `FxCashBalance`
+
+**结论**: 外汇持仓在成交后会显示，但可能一段时间后被系统轧差处理。
+
+#### 2. 飞书 API 集成最佳实践
+- 使用 `receive_id_type=chat_id` 而不是 `conversation_id`
+- 文本消息不支持 `\n` 换行，需使用真实换行符
+- 建议使用 `rich` 或 `card` 类型获得更好的显示效果
+
+#### 3. 多环境配置方案
+**挑战**: 本地开发 vs 远程部署的 Python 路径不同
+
+**解决方案**:
+```yaml
+environments:
+  local:
+    python_path: /usr/local/bin/python3
+    use_venv: false
+  remote:
+    python_path: /Users/openclaw/trading_env/bin/python3
+    use_venv: true
+```
+
+**实现**: `config/env_config.py` 提供 `ensure_venv()` 自动切换
+
+#### 4. 端口访问问题
+**问题**: OpenClaw 端口 18789 使用旧版 TLS，新客户端不支持
+
+**解决**: 改用 HTTP 访问端口 5002
+
+#### 5. 环境配置实施方案
+**完整技术方案**详见 `docs/ENV_CONFIG_IMPLEMENTATION.md`
+
+**核心实现**:
+- `config/settings.yaml` - 多环境配置
+- `config/env_config.py` - 自动环境切换
+- 所有脚本添加 `ensure_venv()` 调用
+
+**关键代码**:
+```python
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from config.env_config import ensure_venv
+ensure_venv()  # 自动切换到虚拟环境 Python
+```
+
+### 经验教训
+
+1. **Git 同步**: 大文件传输使用 tar + scp 比 git clone 更可靠
+2. **环境隔离**: 虚拟环境配置必须在脚本层面处理，不能依赖系统 PATH
+3. **日志管理**: launchd 服务需要配置 StandardOutPath/StandardErrorPath
+4. **配置分离**: 敏感信息（settings.yaml）不应提交到 Git
+
 ---
 *创建时间: 2026-02-05*
-*最后更新: 2026-02-06*
+*最后更新: 2026-02-19*

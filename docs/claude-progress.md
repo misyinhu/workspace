@@ -70,26 +70,29 @@
 
 ---
 
-## 快速恢复指南
+## 📚 历史归档
 
-### 本地开发环境
+**详细项目历史**（Phase 1-3 里程碑、技术发现、经验教训）：
+→ 查看 `docs/findings.md`
+
+**快速恢复指南**：
+→ 查看 `AGENTS.md`
+
+---
+
+## 快速命令
 
 ```bash
-# 1. 进入项目目录
+# 本地
 cd /Users/wang/.opencode/workspace/trading
+./init.sh                    # 启动环境
+./run_tests.sh              # 运行测试
+jq '.metrics' feature_list.json  # 查看进度
 
-# 2. 检查当前状态
-git status
-git log --oneline -5
-
-# 3. 读取功能清单
-cat feature_list.json | jq '.categories.core_trading.features[] | select(.passes == false) | {id, name, priority}'
-
-# 4. 读取进度
-cat docs/claude-progress.md
-
-# 5. 启动服务
-./init.sh
+# 远程
+ssh openclaw@100.102.240.31
+curl http://localhost:5002/health
+launchctl stop com.openclaw.webhook && launchctl start com.openclaw.webhook
 ```
 
 ### 远程机器
