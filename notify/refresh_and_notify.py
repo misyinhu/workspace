@@ -7,13 +7,14 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
-sys.path.insert(0, str(PROJECT_ROOT / "z120_monitor"))
 
 import yaml
 import requests
 import json
 
 from config import get_feishu_app_id, get_feishu_app_secret, get_feishu_chat_id, load_config, get
+
+sys.path.insert(0, str(PROJECT_ROOT / "z120_monitor"))
 
 
 def load_feishu_config():
