@@ -110,8 +110,8 @@ def get_latest_spreads(pairs_config: Dict) -> Dict[str, float]:
                     )
 
                     if bars1 and bars2:
-                        close1 = bars1[0].close
-                        close2 = bars2[0].close
+                        close1 = bars1[-1].close
+                        close2 = bars2[-1].close
                         mult1 = a1.get("multiplier", 1) * a1.get("ratio", 1)
                         mult2 = a2.get("multiplier", 1) * a2.get("ratio", 1)
                         spread = close1 * mult1 - close2 * mult2
