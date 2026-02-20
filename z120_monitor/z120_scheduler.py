@@ -40,7 +40,7 @@ except ImportError:
 
 
 def select_main_contract_for_monitoring(contracts, symbol):
-    """为监控选择主力合约（季月优先，跳过7天内到期，选择最近的）"""
+    """为监控选择主力合约（季月优先，跳过30天内到期，选择最近的）"""
     from datetime import datetime
     
     now = datetime.now()
@@ -54,8 +54,8 @@ def select_main_contract_for_monitoring(contracts, symbol):
         if expiry_str:
             try:
                 expiry = int(expiry_str)
-                # 跳过7天内到期的合约
-                if expiry <= current_day + 7:
+                # 跳过30天内到期的合约
+                if expiry < current_day + 30:
                     continue
                 
                 month = expiry % 100
@@ -174,9 +174,7 @@ def get_latest_spreads(pairs_config: Dict) -> Dict[str, float]:
                         mult1 = a1.get("multiplier", 1) * a1.get("ratio", 1)
                         mult2 = a2.get("multiplier", 1) * a2.get("ratio", 1)
                         spread = close1 * mult1 - close2 * mult2
-                        # 记录合约信息
-                        contract_info = f"{c1.localSymbol}_{c2.localSymbol}" if hasattr(c1, 'localSymbol') and hasattr(c2, 'localSymbol') else ""
-                        results[pair_name] = {"spread": spread, "contract_info": contract_info}
+                        results[pair_name] = spread
                         print(
                             f"    {pair_name}: {close1:.2f}*{mult1} - {close2:.2f}*{mult2} = {spread:.2f}"
                         )
@@ -389,6 +387,7 @@ class Z120ScheduledMonitor:
 
         self.running = False
         self._thread: Optional[threading.Thread] = None
+        self._last_contract_check: str = ""  # 记录上次检查日期
 
     def _load_config(self) -> Dict[str, Any]:
         try:
@@ -497,13 +496,10 @@ class Z120ScheduledMonitor:
         for pair_name, pair_config in self.pairs_config.items():
             print(f"\n📊 检查交易对: {pair_name}")
 
-            spread_data = latest_spreads.get(pair_name)
-            if spread_data is None:
+            current_spread = latest_spreads.get(pair_name)
+            if current_spread is None:
                 print(f"  ❌ 无法获取当前价差")
                 continue
-
-            current_spread = spread_data.get("spread") if isinstance(spread_data, dict) else spread_data
-            contract_info = spread_data.get("contract_info", "") if isinstance(spread_data, dict) else ""
 
             pair_threshold = pair_config.get("threshold", 0)
             oversold = pair_config.get("oversold", 0.0)
@@ -535,27 +531,12 @@ class Z120ScheduledMonitor:
             signal = self.get_signal(zscore, oversold, overbought)
             print(f"  🚦 Signal: {signal['signal']}")
 
-            # 只有当获取到实时价差时才保存
+            # 只有当获取到实时价差时才保存（避免重复保存相同值）
             if CACHE_ENABLED and current_spread is not None:
-                from z120_cache import get_cached_status, clear_pair_history
+                from z120_cache import get_cached_status
 
                 cached = get_cached_status(pair_name)
                 last_spread = cached.get("spread") if cached else None
-                old_contract = cached.get("contract_info", "") if cached else ""
-
-                # 检查合约变化，变化则清空历史
-                if contract_info and old_contract and contract_info != old_contract:
-                    print(f"  🔄 合约变化: {old_contract} -> {contract_info}，清空历史数据")
-                    clear_pair_history(pair_name)
-                    spread_history = None
-                    zresult = None
-                    zscore = None
-                elif contract_info and not old_contract and cached and cached.get("history"):
-                    print(f"  🔄 检测到旧缓存（无合约信息），清空历史数据")
-                    clear_pair_history(pair_name)
-                    spread_history = None
-                    zresult = None
-                    zscore = None
 
                 # 只有新值与上次不同时才保存
                 if last_spread is None or abs(current_spread - last_spread) > 0.01:
@@ -568,22 +549,9 @@ class Z120ScheduledMonitor:
                         threshold=pair_threshold,
                         oversold=oversold,
                         overbought=overbought,
-                        contract_info=contract_info,
                     )
                     print(f"  💾 缓存已更新 ({current_spread:.2f})")
                 else:
-                    # 价差没变化，但需要更新合约信息
-                    if contract_info and old_contract != contract_info:
-                        import json
-                        data = {}
-                        cache_file = Path(__file__).parent / ".." / "data" / "z120_status.json"
-                        if cache_file.exists():
-                            with open(cache_file) as f:
-                                data = json.load(f)
-                        if pair_name in data:
-                            data[pair_name]["contract_info"] = contract_info
-                            with open(cache_file, "w") as f:
-                                json.dump(data, f, indent=2)
                     print(f"  💾 价差无变化，跳过保存")
 
             # 检查7天价差变化
@@ -675,10 +643,37 @@ Z120 值: {zresult.get("zscore", 0):.2f}
         self._thread.start()
         print("✅ Z120 监控已启动")
 
+    def _check_contracts_monthly(self):
+        """每月初检查并更新合约"""
+        from datetime import datetime
+        
+        today = datetime.now().strftime("%Y-%m")
+        if self._last_contract_check == today:
+            return
+        
+        print("\n📅 每月合约检查...")
+        self._last_contract_check = today
+        
+        try:
+            import subprocess
+            import sys
+            script_path = str(BASE_DIR / "update_contracts.py")
+            result = subprocess.run([sys.executable, script_path], capture_output=True, text=True, timeout=60)
+            if result.returncode == 0:
+                print(result.stdout)
+                # 如果合约有更新，重新加载配置
+                self.pairs_config = self._load_pairs_config()
+            else:
+                print(f"  ❌ 合约检查失败: {result.stderr}")
+        except Exception as e:
+            print(f"  ❌ 合约检查失败: {e}")
+
     def _run_loop(self):
         """定时运行"""
         while self.running:
             try:
+                # 每月检查合约
+                self._check_contracts_monthly()
                 self._run_once()
             except Exception as e:
                 print(f"❌ 监控异常: {e}")

@@ -12,12 +12,14 @@ pairs:
         currency: "USD"
         multiplier: 2.0
         ratio: 1
+        local_symbol: "MNQH6"
       - symbol: "MYM"
         exchange: "CBOT"
         sec_type: "FUT"
         currency: "USD"
         multiplier: 0.5
         ratio: 2
+        local_symbol: "MYMH6"
 
   - name: "HSTECH_MCH"
     mode: "value"
@@ -32,12 +34,14 @@ pairs:
         currency: "HKD"
         multiplier: 50
         ratio: 1
+        local_symbol: "HTIH6"
       - symbol: "MCH.HK"
         exchange: "HKFE"
         sec_type: "FUT"
         currency: "HKD"
         multiplier: 10
         ratio: 3
+        local_symbol: "MCHH6"
 
   - name: "RB_CL"
     mode: "value"
@@ -52,9 +56,11 @@ pairs:
         currency: "USD"
         multiplier: 42000
         ratio: 1
+        local_symbol: "RBJ6"
       - symbol: "CL"
         exchange: "NYMEX"
         sec_type: "FUT"
         currency: "USD"
         multiplier: 1000
         ratio: 1
+        local_symbol: "CLJ6"

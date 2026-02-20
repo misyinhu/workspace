@@ -23,13 +23,11 @@ def save_status(
     oversold: float = -3.0,
     overbought: float = 3.0,
     timestamp: Optional[datetime] = None,
-    contract_info: str = "",
 ):
     """保存单个标的的状态到缓存，追加到历史记录
 
     Args:
         timestamp: 可选的自定义时间戳，用于历史重建。如果为None则使用当前时间。
-        contract_info: 当前使用的合约信息（如 "RBJ6_CLJ6"），变化时清空历史
     """
     try:
         data = {}
@@ -43,19 +41,9 @@ def save_status(
 
         # 初始化或获取历史记录
         if pair_name not in data:
-            data[pair_name] = {"history": [], "contract_info": ""}
+            data[pair_name] = {"history": []}
 
-        # 检查合约是否变化，变化则清空历史
-        old_contract = data[pair_name].get("contract_info", "")
-        if contract_info and old_contract and contract_info != old_contract:
-            print(f"  🔄 合约变化: {old_contract} -> {contract_info}，清空历史数据")
-            data[pair_name]["history"] = []
-        elif contract_info and not old_contract and data[pair_name].get("history"):
-            # 旧缓存没有合约信息，但历史数据可能是旧合约的，也清理
-            print(f"  🔄 检测到旧缓存（无合约信息），清空历史数据")
-            data[pair_name]["history"] = []
-
-        # 如果不是自定义时间戳（实时保存），则清理过期数据
+        # 如果不是自定义时间戳（实时保存），则清理7天前的旧数据
         if timestamp is None:
             cutoff = (datetime.now() - timedelta(days=MAX_HISTORY_DAYS)).isoformat()
             data[pair_name]["history"] = [
@@ -83,7 +71,6 @@ def save_status(
                     "overbought": overbought,
                     "timestamp": now_iso,
                     "updated_at": now_str,
-                    "contract_info": contract_info,
                 }
             )
 
@@ -101,23 +88,6 @@ def save_status(
     except Exception as e:
         print(f"❌ 保存缓存失败 ({pair_name}): {e}")
         return False
-
-
-def clear_pair_history(pair_name: str):
-    """清空指定交易对的历史数据"""
-    try:
-        if not os.path.exists(CACHE_FILE):
-            return
-        
-        with open(CACHE_FILE) as f:
-            data = json.load(f)
-        
-        if pair_name in data:
-            data[pair_name]["history"] = []
-            with open(CACHE_FILE, "w") as f:
-                json.dump(data, f, indent=2)
-    except Exception as e:
-        print(f"❌ 清空历史失败 ({pair_name}): {e}")
 
 
 def get_spread_change(pair_name: str, days: int = 7) -> dict:
