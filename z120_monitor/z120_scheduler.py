@@ -40,7 +40,7 @@ except ImportError:
 
 
 def select_main_contract_for_monitoring(contracts, symbol):
-    """为监控选择主力合约（季月优先，跳过30天内到期）"""
+    """为监控选择主力合约（季月优先，跳过30天内到期，选择最近的）"""
     from datetime import datetime
     
     now = datetime.now()
@@ -72,8 +72,8 @@ def select_main_contract_for_monitoring(contracts, symbol):
                 continue
     
     if candidates:
-        # 按优先级和到期日排序
-        candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
+        # 按优先级降序，到期日升序（优先选择最近的季月）
+        candidates.sort(key=lambda x: (x[0], x[1]))
         return candidates[0][2]
     
     # 如果没有合适的，返回第一个
