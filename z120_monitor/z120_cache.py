@@ -103,6 +103,23 @@ def save_status(
         return False
 
 
+def clear_pair_history(pair_name: str):
+    """清空指定交易对的历史数据"""
+    try:
+        if not os.path.exists(CACHE_FILE):
+            return
+        
+        with open(CACHE_FILE) as f:
+            data = json.load(f)
+        
+        if pair_name in data:
+            data[pair_name]["history"] = []
+            with open(CACHE_FILE, "w") as f:
+                json.dump(data, f, indent=2)
+    except Exception as e:
+        print(f"❌ 清空历史失败 ({pair_name}): {e}")
+
+
 def get_spread_change(pair_name: str, days: int = 7) -> dict:
     """
     获取价差变化量

@@ -535,12 +535,27 @@ class Z120ScheduledMonitor:
             signal = self.get_signal(zscore, oversold, overbought)
             print(f"  🚦 Signal: {signal['signal']}")
 
-            # 只有当获取到实时价差时才保存（避免重复保存相同值）
+            # 只有当获取到实时价差时才保存
             if CACHE_ENABLED and current_spread is not None:
-                from z120_cache import get_cached_status
+                from z120_cache import get_cached_status, clear_pair_history
 
                 cached = get_cached_status(pair_name)
                 last_spread = cached.get("spread") if cached else None
+                old_contract = cached.get("contract_info", "") if cached else ""
+
+                # 检查合约变化，变化则清空历史
+                if contract_info and old_contract and contract_info != old_contract:
+                    print(f"  🔄 合约变化: {old_contract} -> {contract_info}，清空历史数据")
+                    clear_pair_history(pair_name)
+                    spread_history = None
+                    zresult = None
+                    zscore = None
+                elif contract_info and not old_contract and cached and cached.get("history"):
+                    print(f"  🔄 检测到旧缓存（无合约信息），清空历史数据")
+                    clear_pair_history(pair_name)
+                    spread_history = None
+                    zresult = None
+                    zscore = None
 
                 # 只有新值与上次不同时才保存
                 if last_spread is None or abs(current_spread - last_spread) > 0.01:
@@ -557,6 +572,18 @@ class Z120ScheduledMonitor:
                     )
                     print(f"  💾 缓存已更新 ({current_spread:.2f})")
                 else:
+                    # 价差没变化，但需要更新合约信息
+                    if contract_info and old_contract != contract_info:
+                        import json
+                        data = {}
+                        cache_file = Path(__file__).parent / ".." / "data" / "z120_status.json"
+                        if cache_file.exists():
+                            with open(cache_file) as f:
+                                data = json.load(f)
+                        if pair_name in data:
+                            data[pair_name]["contract_info"] = contract_info
+                            with open(cache_file, "w") as f:
+                                json.dump(data, f, indent=2)
                     print(f"  💾 价差无变化，跳过保存")
 
             # 检查7天价差变化
