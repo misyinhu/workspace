@@ -23,11 +23,13 @@ def save_status(
     oversold: float = -3.0,
     overbought: float = 3.0,
     timestamp: Optional[datetime] = None,
+    contract_info: str = "",
 ):
     """保存单个标的的状态到缓存，追加到历史记录
 
     Args:
         timestamp: 可选的自定义时间戳，用于历史重建。如果为None则使用当前时间。
+        contract_info: 当前使用的合约信息（如 "RBJ6_CLJ6"），变化时清空历史
     """
     try:
         data = {}
@@ -41,9 +43,15 @@ def save_status(
 
         # 初始化或获取历史记录
         if pair_name not in data:
-            data[pair_name] = {"history": []}
+            data[pair_name] = {"history": [], "contract_info": ""}
 
-        # 如果不是自定义时间戳（实时保存），则清理7天前的旧数据
+        # 检查合约是否变化，变化则清空历史
+        old_contract = data[pair_name].get("contract_info", "")
+        if contract_info and old_contract and contract_info != old_contract:
+            print(f"  🔄 合约变化: {old_contract} -> {contract_info}，清空历史数据")
+            data[pair_name]["history"] = []
+
+        # 如果不是自定义时间戳（实时保存），则清理过期数据
         if timestamp is None:
             cutoff = (datetime.now() - timedelta(days=MAX_HISTORY_DAYS)).isoformat()
             data[pair_name]["history"] = [
@@ -71,6 +79,7 @@ def save_status(
                     "overbought": overbought,
                     "timestamp": now_iso,
                     "updated_at": now_str,
+                    "contract_info": contract_info,
                 }
             )
 

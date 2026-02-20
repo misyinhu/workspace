@@ -174,7 +174,9 @@ def get_latest_spreads(pairs_config: Dict) -> Dict[str, float]:
                         mult1 = a1.get("multiplier", 1) * a1.get("ratio", 1)
                         mult2 = a2.get("multiplier", 1) * a2.get("ratio", 1)
                         spread = close1 * mult1 - close2 * mult2
-                        results[pair_name] = spread
+                        # 记录合约信息
+                        contract_info = f"{c1.localSymbol}_{c2.localSymbol}" if hasattr(c1, 'localSymbol') and hasattr(c2, 'localSymbol') else ""
+                        results[pair_name] = {"spread": spread, "contract_info": contract_info}
                         print(
                             f"    {pair_name}: {close1:.2f}*{mult1} - {close2:.2f}*{mult2} = {spread:.2f}"
                         )
@@ -495,10 +497,13 @@ class Z120ScheduledMonitor:
         for pair_name, pair_config in self.pairs_config.items():
             print(f"\n📊 检查交易对: {pair_name}")
 
-            current_spread = latest_spreads.get(pair_name)
-            if current_spread is None:
+            spread_data = latest_spreads.get(pair_name)
+            if spread_data is None:
                 print(f"  ❌ 无法获取当前价差")
                 continue
+
+            current_spread = spread_data.get("spread") if isinstance(spread_data, dict) else spread_data
+            contract_info = spread_data.get("contract_info", "") if isinstance(spread_data, dict) else ""
 
             pair_threshold = pair_config.get("threshold", 0)
             oversold = pair_config.get("oversold", 0.0)
@@ -548,6 +553,7 @@ class Z120ScheduledMonitor:
                         threshold=pair_threshold,
                         oversold=oversold,
                         overbought=overbought,
+                        contract_info=contract_info,
                     )
                     print(f"  💾 缓存已更新 ({current_spread:.2f})")
                 else:
