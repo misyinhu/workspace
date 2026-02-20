@@ -10,7 +10,7 @@ from typing import Optional
 CACHE_DIR = Path(__file__).parent / ".." / "data"
 CACHE_DIR.mkdir(exist_ok=True)
 CACHE_FILE = CACHE_DIR / "z120_status.json"
-MAX_HISTORY_DAYS = 7
+MAX_HISTORY_DAYS = 14
 
 
 def save_status(
