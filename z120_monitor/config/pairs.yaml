@@ -32,7 +32,7 @@ pairs:
         currency: "HKD"
         multiplier: 50
         ratio: 1
-      - symbol: "MCH"
+      - symbol: "MCH.HK"
         exchange: "HKFE"
         sec_type: "FUT"
         currency: "HKD"
