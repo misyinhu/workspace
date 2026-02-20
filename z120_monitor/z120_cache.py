@@ -50,6 +50,10 @@ def save_status(
         if contract_info and old_contract and contract_info != old_contract:
             print(f"  🔄 合约变化: {old_contract} -> {contract_info}，清空历史数据")
             data[pair_name]["history"] = []
+        elif contract_info and not old_contract and data[pair_name].get("history"):
+            # 旧缓存没有合约信息，但历史数据可能是旧合约的，也清理
+            print(f"  🔄 检测到旧缓存（无合约信息），清空历史数据")
+            data[pair_name]["history"] = []
 
         # 如果不是自定义时间戳（实时保存），则清理过期数据
         if timestamp is None:
