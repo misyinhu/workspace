@@ -10,7 +10,7 @@ from typing import Optional
 CACHE_DIR = Path(__file__).parent / ".." / "data"
 CACHE_DIR.mkdir(exist_ok=True)
 CACHE_FILE = CACHE_DIR / "z120_status.json"
-MAX_HISTORY_DAYS = 14
+MAX_HISTORY_DAYS = 7
 
 
 def save_status(
@@ -20,8 +20,6 @@ def save_status(
     mean: float,
     std: float,
     threshold: float = 0,
-    oversold: float = -3.0,
-    overbought: float = 3.0,
     timestamp: Optional[datetime] = None,
 ):
     """保存单个标的的状态到缓存，追加到历史记录
@@ -67,8 +65,6 @@ def save_status(
                     "mean": mean,
                     "std": std,
                     "threshold": threshold,
-                    "oversold": oversold,
-                    "overbought": overbought,
                     "timestamp": now_iso,
                     "updated_at": now_str,
                 }
@@ -93,8 +89,7 @@ def save_status(
 def get_spread_change(pair_name: str, days: int = 7) -> dict:
     """
     获取价差变化量
-    如果找不到指定天数的记录，使用最早可用的记录
-    返回: {"current": xxx, "past": xxx, "change": xxx, "change_pct": xxx, "actual_days": xxx}
+    返回: {"current": xxx, "past": xxx, "change": xxx, "change_pct": xxx}
     """
     try:
         data = {}
@@ -103,7 +98,7 @@ def get_spread_change(pair_name: str, days: int = 7) -> dict:
                 data = json.load(f)
 
         history = data.get(pair_name, {}).get("history", [])
-        if len(history) < 2:
+        if not history:
             return {}
 
         now = datetime.now()
@@ -115,18 +110,12 @@ def get_spread_change(pair_name: str, days: int = 7) -> dict:
             if h.get("timestamp", "") <= cutoff:
                 past_record = h
                 break
-        
-        # 如果找不到7天前的记录，使用最早的一条
-        if not past_record:
-            past_record = history[0]
-            # 计算实际天数
-            past_time = datetime.fromisoformat(past_record.get("timestamp", ""))
-            actual_days = (now - past_time).days
-        else:
-            actual_days = days
 
         # 当前记录（最新的）
-        current_record = history[-1]
+        current_record = history[-1] if history else None
+
+        if not current_record or not past_record:
+            return {}
 
         current_spread = current_record.get("spread", 0)
         past_spread = past_record.get("spread", 0)
@@ -138,7 +127,6 @@ def get_spread_change(pair_name: str, days: int = 7) -> dict:
             "change": change,
             "change_pct": (change / past_spread * 100) if past_spread != 0 else 0,
             "days": days,
-            "actual_days": actual_days,
         }
     except Exception as e:
         print(f"❌ 获取价差变化失败 ({pair_name}): {e}")
@@ -181,10 +169,6 @@ def get_cached_spread_history(pair_name: str, days: int = 7) -> list:
         filtered = [
             h.get("spread", 0) for h in history if h.get("timestamp", "") > cutoff
         ]
-
-        # 如果过滤后为空，使用所有可用数据（避免缓存过期导致无法计算）
-        if not filtered:
-            filtered = [h.get("spread", 0) for h in history]
 
         return filtered if filtered else None
     except Exception as e:
@@ -254,28 +238,14 @@ def format_status_text(pair_name: str = None):
         zscore = data.get("zscore", "N/A")
         spread = data.get("spread", "N/A")
         threshold = data.get("threshold", 0)
-        oversold = data.get("oversold", -3.0)
-        overbought = data.get("overbought", 3.0)
         updated = data.get("updated_at", "未知")
 
         change_info = get_spread_change(name, days=7)
         change = change_info.get("change", 0) if change_info else 0
-        actual_days = change_info.get("actual_days", 7) if change_info else 7
-
-        # 计算信号状态
-        signal_emoji = "⚪"
-        signal_text = "中性"
-        if isinstance(zscore, (int, float)) and zscore is not None:
-            if zscore <= oversold:
-                signal_emoji = "🟢"
-                signal_text = "超卖(做多)"
-            elif zscore >= overbought:
-                signal_emoji = "🔴"
-                signal_text = "超买(做空)"
 
         text += f"**{name}:**\n"
         text += (
-            f"  Z120: {zscore:.2f} {signal_emoji} {signal_text}"
+            f"  Z120: {zscore:.2f}"
             if isinstance(zscore, (int, float))
             else f"  Z120: {zscore}\n"
         )
@@ -285,9 +255,7 @@ def format_status_text(pair_name: str = None):
             else f"  价差: {spread}\n"
         )
         if threshold > 0:
-            day_label = f"{actual_days}天" if actual_days < 7 else "7天"
-            text += f"  价差阈值: ±{threshold} ({day_label}变化: {change:+.0f})\n"
-        text += f"  Z120阈值: {oversold} ~ {overbought}\n"
+            text += f"  阈值: ±{threshold} (7天变化: {change:+.0f})\n"
         text += f"  更新: {updated}\n\n"
 
     return text
