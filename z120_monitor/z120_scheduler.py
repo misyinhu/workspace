@@ -40,7 +40,7 @@ except ImportError:
 
 
 def select_main_contract_for_monitoring(contracts, symbol):
-    """为监控选择主力合约（季月优先，跳过30天内到期，选择最近的）"""
+    """为监控选择主力合约（季月优先，跳过7天内到期，选择最近的）"""
     from datetime import datetime
     
     now = datetime.now()
@@ -54,8 +54,8 @@ def select_main_contract_for_monitoring(contracts, symbol):
         if expiry_str:
             try:
                 expiry = int(expiry_str)
-                # 跳过30天内到期的合约
-                if expiry < current_day + 30:
+                # 跳过7天内到期的合约
+                if expiry <= current_day + 7:
                     continue
                 
                 month = expiry % 100
