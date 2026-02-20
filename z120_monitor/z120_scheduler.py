@@ -39,6 +39,47 @@ except ImportError:
     get_cached_spread_history = None
 
 
+def select_main_contract_for_monitoring(contracts, symbol):
+    """为监控选择主力合约（季月优先，跳过30天内到期）"""
+    from datetime import datetime
+    
+    now = datetime.now()
+    current_day = now.year * 10000 + now.month * 100 + now.day
+    quarter_months = [3, 6, 9, 12]
+    
+    candidates = []
+    for d in contracts:
+        c = d.contract
+        expiry_str = c.lastTradeDateOrContractMonth
+        if expiry_str:
+            try:
+                expiry = int(expiry_str)
+                # 跳过30天内到期的合约
+                if expiry < current_day + 30:
+                    continue
+                
+                month = expiry % 100
+                priority = 0
+                if month in quarter_months:
+                    priority = 3
+                elif month == (now.month % 100) + 1:
+                    priority = 2
+                else:
+                    priority = 1
+                    
+                candidates.append((priority, expiry, c))
+            except:
+                continue
+    
+    if candidates:
+        # 按优先级和到期日排序
+        candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
+        return candidates[0][2]
+    
+    # 如果没有合适的，返回第一个
+    return contracts[0].contract if contracts else None
+
+
 def get_latest_spreads(pairs_config: Dict) -> Dict[str, float]:
     """一次 IB 连接获取所有交易对的当前价差"""
     try:
@@ -61,19 +102,29 @@ def get_latest_spreads(pairs_config: Dict) -> Dict[str, float]:
                 try:
                     # 获取资产1
                     a1 = assets[0]
-                    if a1.get("sec_type") == "FUT" and a1.get("local_symbol"):
-                        c1 = Future(
-                            symbol=a1.get("symbol", ""),
-                            localSymbol=a1.get("local_symbol", ""),
-                            exchange=a1.get("exchange", ""),
-                            currency=a1.get("currency", ""),
-                        )
-                    else:
+                    c1 = None
+
+                    if a1.get("sec_type") == "FUT":
+                        # 自动获取主力合约
+                        symbol = a1.get("symbol", "")
+                        exchange = a1.get("exchange", "")
+                        currency = a1.get("currency", "USD")
+                        
+                        # 先查询合约列表
+                        contracts = ib.reqContractDetails(Future(symbol=symbol, exchange=exchange, currency=currency))
+                        if contracts:
+                            # 选择主力合约（季月优先）
+                            main_contract = select_main_contract_for_monitoring(contracts, symbol)
+                            c1 = main_contract
+                            print(f"    {symbol} 使用主力合约: {c1.localSymbol}")
+                    
+                    if not c1:
                         c1 = Stock(
                             symbol=a1.get("symbol", ""),
                             exchange=a1.get("exchange", ""),
                             currency=a1.get("currency", ""),
                         )
+                    
                     bars1 = ib.reqHistoricalData(
                         c1,
                         endDateTime="",
@@ -86,19 +137,27 @@ def get_latest_spreads(pairs_config: Dict) -> Dict[str, float]:
 
                     # 获取资产2
                     a2 = assets[1]
-                    if a2.get("sec_type") == "FUT" and a2.get("local_symbol"):
-                        c2 = Future(
-                            symbol=a2.get("symbol", ""),
-                            localSymbol=a2.get("local_symbol", ""),
-                            exchange=a2.get("exchange", ""),
-                            currency=a2.get("currency", ""),
-                        )
-                    else:
+                    c2 = None
+                    
+                    if a2.get("sec_type") == "FUT":
+                        # 自动获取主力合约
+                        symbol = a2.get("symbol", "")
+                        exchange = a2.get("exchange", "")
+                        currency = a2.get("currency", "USD")
+                        
+                        contracts = ib.reqContractDetails(Future(symbol=symbol, exchange=exchange, currency=currency))
+                        if contracts:
+                            main_contract = select_main_contract_for_monitoring(contracts, symbol)
+                            c2 = main_contract
+                            print(f"    {symbol} 使用主力合约: {c2.localSymbol}")
+                    
+                    if not c2:
                         c2 = Stock(
                             symbol=a2.get("symbol", ""),
                             exchange=a2.get("exchange", ""),
                             currency=a2.get("currency", ""),
                         )
+                    
                     bars2 = ib.reqHistoricalData(
                         c2,
                         endDateTime="",
@@ -164,11 +223,11 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
         print(f"  ✅ 所有交易对历史数据完整")
         return False
 
-    print(f"\n📥 开始获取2天历史数据（{len(needs_rebuild)}个交易对）...")
+    print(f"\n📥 开始获取7天历史数据（{len(needs_rebuild)}个交易对）...")
 
     nest_asyncio.apply()
 
-    async def fetch_48d_history(pair_name, pair_config):
+    async def fetch_7d_history(pair_name, pair_config):
         """获取单个交易对48天历史数据并计算价差"""
         assets = pair_config.get("assets", [])
         if len(assets) < 2:
@@ -198,7 +257,7 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
             bars1 = ib.reqHistoricalData(
                 c1,
                 endDateTime="",
-                durationStr="2 D",
+                durationStr="7 D",
                 barSizeSetting="5 mins",
                 whatToShow="TRADES",
                 useRTH=False,
@@ -224,7 +283,7 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
             bars2 = ib.reqHistoricalData(
                 c2,
                 endDateTime="",
-                durationStr="2 D",
+                durationStr="7 D",
                 barSizeSetting="5 mins",
                 whatToShow="TRADES",
                 useRTH=False,
@@ -243,9 +302,11 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
 
             # 创建时间戳到价格的映射
             def get_timestamp(bar_date):
-                """统一处理日期类型"""
+                """统一处理日期类型，处理带时区的时间"""
                 if hasattr(bar_date, "timestamp"):
-                    return bar_date.timestamp()
+                    # 如果带时区，转换为UTC时间戳
+                    ts = bar_date.timestamp()
+                    return ts
                 else:
                     # 如果是date对象，转换为datetime
                     from datetime import datetime as dt
@@ -255,9 +316,9 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
             price_map1 = {get_timestamp(bar.date): bar.close for bar in bars1}
             price_map2 = {get_timestamp(bar.date): bar.close for bar in bars2}
 
-            # 找到共同的时间戳（只保留最近的48小时）
+            # 找到共同的时间戳（只保留最近的7天）
             now_ts = datetime.now().timestamp()
-            cutoff_ts = now_ts - 48 * 3600
+            cutoff_ts = now_ts - 7 * 24 * 3600
             common_timestamps = sorted(
                 ts
                 for ts in set(price_map1.keys()) & set(price_map2.keys())
@@ -298,7 +359,7 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
 
     total_added = 0
     for pair_name, pair_config in needs_rebuild:
-        count = loop.run_until_complete(fetch_48d_history(pair_name, pair_config))
+        count = loop.run_until_complete(fetch_7d_history(pair_name, pair_config))
         total_added += count
         time.sleep(1)  # 避免请求过快
 
@@ -485,6 +546,8 @@ class Z120ScheduledMonitor:
                         mean=zresult.get("mean", 0) if zresult else 0,
                         std=zresult.get("std", 0) if zresult else 0,
                         threshold=pair_threshold,
+                        oversold=oversold,
+                        overbought=overbought,
                     )
                     print(f"  💾 缓存已更新 ({current_spread:.2f})")
                 else:
