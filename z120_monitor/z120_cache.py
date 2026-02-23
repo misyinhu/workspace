@@ -165,11 +165,13 @@ def get_cached_spread_history(pair_name: str, days: int = 7) -> list:
         now = datetime.now()
         cutoff = (now - timedelta(days=days)).isoformat()
 
-        # 按时间范围筛选
+        # 按时间范围筛选，取最新的120个点（history是最旧在前）
         filtered = [
             h.get("spread", 0) for h in history if h.get("timestamp", "") > cutoff
         ]
-
+        
+        # 取最新的120个点
+        filtered = filtered[-120:]
         return filtered if filtered else None
     except Exception as e:
         print(f"❌ 获取历史价差失败 ({pair_name}): {e}")

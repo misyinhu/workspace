@@ -403,7 +403,7 @@ class Z120ScheduledMonitor:
         import numpy as np
 
         # 只取最近120个点
-        spread_values = spread_values[:120]
+        spread_values = spread_values[-120:]
 
         if len(spread_values) < 2:
             return {
