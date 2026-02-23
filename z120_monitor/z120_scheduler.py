@@ -178,7 +178,7 @@ def get_latest_spreads(pairs_config: Dict) -> Dict[str, float]:
 
 
 def rebuild_history_if_needed(pairs_config: Dict) -> bool:
-    """检查历史数据完整性，不足100条则自动获取48天历史数据重建"""
+    """检查历史数据完整性，不足100条则自动获取7天历史数据重建"""
     from z120_cache import get_cached_status, save_status
     from client.ibkr_client import get_client_id, IBKR_HOST, IBKR_PORT
     import asyncio
@@ -205,7 +205,7 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
         print(f"  ✅ 所有交易对历史数据完整")
         return False
 
-    print(f"\n📥 开始获取2天历史数据（{len(needs_rebuild)}个交易对）...")
+    print(f"\n📥 开始获取7天历史数据（{len(needs_rebuild)}个交易对）...")
 
     nest_asyncio.apply()
 
@@ -240,7 +240,7 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
             bars1 = ib.reqHistoricalData(
                 c1,
                 endDateTime="",
-                durationStr="2 D",
+                durationStr="7 D",
                 barSizeSetting="5 mins",
                 whatToShow="TRADES",
                 useRTH=False,
@@ -266,7 +266,7 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
             bars2 = ib.reqHistoricalData(
                 c2,
                 endDateTime="",
-                durationStr="2 D",
+                durationStr="7 D",
                 barSizeSetting="5 mins",
                 whatToShow="TRADES",
                 useRTH=False,
@@ -299,7 +299,7 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
 
             # 找到共同的时间戳（只保留最近的48小时）
             now_ts = datetime.now().timestamp()
-            cutoff_ts = now_ts - 48 * 3600
+            cutoff_ts = now_ts - 7 * 24 * 3600
             common_timestamps = sorted(
                 ts
                 for ts in set(price_map1.keys()) & set(price_map2.keys())
@@ -427,7 +427,7 @@ class Z120ScheduledMonitor:
                 "message": "标准差为0",
             }
 
-        last_spread = spread_values[0]
+        last_spread = spread_values[-1]  # 取最新的
         zscore = (last_spread - mean) / std
 
         return {
