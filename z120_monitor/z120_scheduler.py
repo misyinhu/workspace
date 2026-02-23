@@ -38,6 +38,46 @@ except ImportError:
     get_spread_change = None
     get_cached_spread_history = None
 
+# IB 连接状态追踪
+IB_STATE_FILE = Path(__file__).parent / ".." / "data" / "ib_connection_state.json"
+
+def get_ib_state() -> dict:
+    if IB_STATE_FILE.exists():
+        try:
+            with open(IB_STATE_FILE) as f:
+                return json.load(f)
+        except: pass
+    return {"first_failure": None, "alert_sent": False}
+
+def save_ib_state(state: dict):
+    IB_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(IB_STATE_FILE, 'w') as f:
+        json.dump(state, f, indent=2)
+
+def send_feishu_alert(msg: str):
+    import subprocess
+    try:
+        subprocess.run(["python3", "/Users/wang/.config/opencode/skills/feishu-notifier/scripts/send_message.py", "--method", "api", "--type", "text", "--content", msg], capture_output=True, timeout=30)
+    except: pass
+
+def manage_ib_alerts(connected: bool):
+    now = datetime.now()
+    state = get_ib_state()
+    if connected:
+        if state.get("first_failure"):
+            dur = (now - datetime.fromisoformat(state["first_failure"])).total_seconds()/3600
+            send_feishu_alert(f"🔄 IB Gateway 恢复，离线 {dur:.1f}小时")
+        state = {"first_failure": None, "alert_sent": False}
+    else:
+        if state.get("first_failure") is None:
+            state["first_failure"] = now.isoformat()
+        else:
+            dur = (now - datetime.fromisoformat(state["first_failure"])).total_seconds()/3600
+            if now.weekday()<5 and dur>1 and not state.get("alert_sent"):
+                send_feishu_alert(f"🛑 IB Gateway 断线超过1小时！已离线{dur:.1f}小时")
+                state["alert_sent"] = True
+    save_ib_state(state)
+
 
 def get_latest_spreads(pairs_config: Dict) -> Dict[str, float]:
     """一次 IB 连接获取所有交易对的当前价差"""
@@ -50,7 +90,8 @@ def get_latest_spreads(pairs_config: Dict) -> Dict[str, float]:
 
         async def fetch():
             ib = IB()
-            await ib.connectAsync(IBKR_HOST, IBKR_PORT, clientId=get_client_id())
+            client_id = get_client_id()
+            await ib.connectAsync(IBKR_HOST, IBKR_PORT, clientId=client_id)
 
             results = {}
             for pair_name, pair_config in pairs_config.items():
@@ -177,7 +218,8 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
 
         try:
             ib = IB()
-            await ib.connectAsync(IBKR_HOST, IBKR_PORT, clientId=get_client_id())
+            client_id = get_client_id()
+            await ib.connectAsync(IBKR_HOST, IBKR_PORT, clientId=client_id)
 
             # 获取资产1的48天历史数据
             a1 = assets[0]
@@ -430,6 +472,8 @@ class Z120ScheduledMonitor:
         rebuild_history_if_needed(self.pairs_config)
 
         latest_spreads = get_latest_spreads(self.pairs_config)
+        # IB 连接告警
+        manage_ib_alerts(len(latest_spreads) > 0)
         print(f"\n✅ 获取到 {len(latest_spreads)} 个交易对的当前价差")
 
         for pair_name, pair_config in self.pairs_config.items():

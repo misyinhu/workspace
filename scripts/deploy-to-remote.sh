@@ -17,6 +17,7 @@ tar -czf "$TEMP_FILE" \
   --exclude='config/settings.yaml' \
   --exclude='AGENTS.md' \
   --exclude='.DS_Store' \
+  --exclude='data/z120_status.json' \
   -C "$PROJECT_DIR" .
 
 echo "📤 传输到远程服务器..."

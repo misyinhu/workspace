@@ -27,6 +27,7 @@ from ib_insync import (
     StopOrder,
     StopLimitOrder,
     Contract,
+    Order,
 )
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -168,7 +169,12 @@ def parse_args():
     parser = argparse.ArgumentParser(description="下单交易")
     parser.add_argument("--symbol")
     parser.add_argument("--action", choices=["BUY", "SELL"])
-    parser.add_argument("--quantity", type=int)
+    parser.add_argument("--quantity", type=float)
+    parser.add_argument(
+        "--cash_quantity",
+        type=float,
+        help="现金数量（加密货币专用，表示美元金额）",
+    )
     parser.add_argument("--order_type", default="MKT")
     parser.add_argument("--limit_price", type=float)
     parser.add_argument("--stop_price", type=float)
@@ -366,28 +372,48 @@ def main():
                 exchange="SMART",
                 currency=args.currency,
             )
+        elif args.sec_type == "CRYPTO":
+            contract = Contract(
+                symbol=args.symbol,
+                secType="CRYPTO",
+                exchange=args.exchange or "PAXOS",
+                currency=args.currency,
+            )
         else:
             contract = Stock(
                 args.symbol, exchange=args.exchange, currency=args.currency
             )
 
         # 创建订单
-        order_kwargs = {"action": args.action, "totalQuantity": args.quantity}
-        if args.order_type == "MKT":
-            order = MarketOrder(**order_kwargs)
-        elif args.order_type == "LMT":
-            order = LimitOrder(limitPrice=args.limit_price, **order_kwargs)
-        elif args.order_type == "STP":
-            order = StopOrder(stopPrice=args.stop_price, **order_kwargs)
-        elif args.order_type == "STP LMT":
-            order = StopLimitOrder(
-                limitPrice=args.limit_price, stopPrice=args.stop_price, **order_kwargs
-            )
+        if args.sec_type == "CRYPTO" and args.cash_quantity:
+            # 加密货币现金订单 - 必须使用 Order() 直接创建
+            order = Order()
+            order.action = args.action
+            order.orderType = args.order_type
+            order.totalQuantity = 0  # 不指定数量，使用 cashQty
+            order.cashQty = args.cash_quantity
+            if args.order_type == "MKT":
+                order.tif = "IOC"  # 加密货币 MKT 只支持 IOC
+            else:
+                order.tif = args.tif
+            order.outsideRth = args.outside_rth
         else:
-            order = MarketOrder(**order_kwargs)
-
-        order.tif = args.tif
-        order.outsideRth = args.outside_rth
+            # 普通订单
+            order_kwargs = {"action": args.action, "totalQuantity": args.quantity}
+            if args.order_type == "MKT":
+                order = MarketOrder(**order_kwargs)
+            elif args.order_type == "LMT":
+                order = LimitOrder(limitPrice=args.limit_price, **order_kwargs)
+            elif args.order_type == "STP":
+                order = StopOrder(stopPrice=args.stop_price, **order_kwargs)
+            elif args.order_type == "STP LMT":
+                order = StopLimitOrder(
+                    limitPrice=args.limit_price, stopPrice=args.stop_price, **order_kwargs
+                )
+            else:
+                order = MarketOrder(**order_kwargs)
+            order.tif = args.tif
+            order.outsideRth = args.outside_rth
 
         # 下单（带回退机制）
         if args.use_main_contract:

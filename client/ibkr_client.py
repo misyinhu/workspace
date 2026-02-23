@@ -109,16 +109,37 @@ def is_web_environment():
 
 
 def get_client_id():
-    """获取clientId"""
+    """获取clientId
+    - Web环境: 返回 0
+    - Z120环境: 返回 1
+    - 其他: 动态分配 2-10
+    """
+    # 检测 Z120 环境（通过环境变量或进程名）
+    if os.environ.get("IB_ENV_TYPE") == "z120":
+        return 1
+    
+    # 检测是否是 z120_scheduler.py 进程
+    try:
+        current_pid = os.getpid()
+        parent = psutil.Process(current_pid)
+        # 检查进程名或命令行是否包含 z120
+        cmdline = " ".join(parent.cmdline() or [])
+        if "z120_scheduler" in cmdline or "z120_monitor" in cmdline:
+            return 1
+    except:
+        pass
+    
+    # Web 环境固定用 0
     if is_web_environment():
-        return 0  # Web固定用0
+        return 0
 
-    # 非Web用2-9轮询，找真正可用的
+    # 动态分配 2-9
     for client_id in range(2, 10):
         if is_client_id_available(client_id):
             return client_id
-
-    # 都不可用，返回 2（让连接失败更明显）
+    # 都不可用，强制 kill clientId=2 然后返回 2
+    print("⚠️ 所有 clientId 不可用，强制释放 clientId=2")
+    kill_process_using_client_id(2)
     return 2
 
 
@@ -137,8 +158,8 @@ def is_client_id_available(client_id):
 
 def kill_process_using_client_id(target_client_id):
     """终止使用指定clientId的进程"""
-    if target_client_id == 1:
-        return  # 永不kill Web client
+    if target_client_id == 1 or target_client_id == 0:
+        return  # 永不kill scheduler 或 web client
 
     for proc in psutil.process_iter(["pid", "cmdline"]):
         try:

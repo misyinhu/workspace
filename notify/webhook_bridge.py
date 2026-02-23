@@ -331,20 +331,68 @@ COMMANDS = {
 }
 
 
-@app.route("/webhook", methods=["POST"])
-def webhook():
-    """接收TradingView Webhook"""
+@app.route("/tv-webhook", methods=["POST"])
+def tv_webhook():
+    """接收Webhook（任意来源，支持 TradingView 自动交易）"""
     try:
         data = request.json
-        print(f"收到TradingView数据:")
+        print(f"收到Webhook数据:")
         print(json.dumps(data, indent=2, ensure_ascii=False))
 
-        title = data.get("title", "MNQ-MYM警报")
-        description = data.get("description", "")
+        # 检查是否是交易信号（包含 symbol, action）
+        symbol = data.get("symbol", "").upper()
+        action = data.get("action", "").upper()
 
-        success, result = send_feishu(f"{title}\n\n{description}")
-        return jsonify({"status": "ok" if success else "error", "result": result})
+        if symbol and action in ("BUY", "SELL"):
+            # 自动交易模式
+            quantity = data.get("quantity", 1)
+            order_type = data.get("order_type", "MKT")
+            sec_type = data.get("sec_type", "FUT")
+            exchange = data.get("exchange", "COMEX")
+            use_main_contract = data.get("use_main_contract", True)
+            limit_price = data.get("limit_price")
+
+            # 构建命令
+            cmd = [
+                get_python_cmd(),
+                str(Path(PROJECT_ROOT) / "orders" / "place_order.py"),
+                "--symbol", symbol,
+                "--action", action,
+                "--quantity", str(quantity),
+                "--order_type", order_type,
+            ]
+
+            if sec_type:
+                cmd.extend(["--sec_type", sec_type])
+            if exchange:
+                cmd.extend(["--exchange", exchange])
+            if use_main_contract:
+                cmd.append("--use_main_contract")
+            if limit_price:
+                cmd.extend(["--limit_price", str(limit_price)])
+            if data.get("stop_price"):
+                cmd.extend(["--stop_price", str(data.get("stop_price"))])
+
+            print(f"执行交易命令: {' '.join(cmd)}")
+
+            # 执行下单
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            output = result.stdout + result.stderr
+
+            # 发送交易结果到飞书
+            msg = f"🤖 Webhook 交易信号\n\n标的: {symbol}\n操作: {action}\n数量: {quantity}\n订单类型: {order_type}\n\n结果:\n{output[:500]}"
+            send_feishu(msg)
+
+            return jsonify({"status": "ok", "order": output[:200]})
+        else:
+            # 仅通知模式
+            title = data.get("title", "Webhook 警报")
+            description = data.get("description", "")
+            success, result = send_feishu(f"{title}\n\n{description}")
+            return jsonify({"status": "ok" if success else "error", "result": result})
+
     except Exception as e:
+        print(f"Webhook错误: {e}")
         return jsonify({"error": str(e)}), 500
 
 

@@ -138,6 +138,26 @@ python3 ~/.opencode/workspace/trading/orders/place_order.py --symbol AAPL --clos
 
 ## 使用示例
 
+### 加密货币现货 (24/7 交易)
+
+```bash
+# 买入 $100 价值的 BTC 现货 (Paxos) - 使用 cash_quantity 指定美元金额
+python3 ~/.opencode/workspace/trading/orders/place_order.py --symbol BTC --action BUY --cash_quantity 100 --order_type MKT --sec_type CRYPTO --exchange PAXOS
+
+# 买入 $500 价值的 ETH 现货
+python3 ~/.opencode/workspace/trading/orders/place_order.py --symbol ETH --action BUY --cash_quantity 500 --order_type MKT --sec_type CRYPTO --exchange PAXOS
+
+# 卖出 $100 价值的 BTC 现货
+python3 ~/.opencode/workspace/trading/orders/place_order.py --symbol BTC --action SELL --cash_quantity 100 --order_type MKT --sec_type CRYPTO --exchange PAXOS
+```
+
+**支持的加密货币**: BTC, ETH, BCH, LTC, XRP, SOL, ADA, LINK, DOGE, AVAX, SUI
+
+**注意**:
+- 加密货币现货需要使用 `--cash_quantity` 指定美元金额，而非 `--quantity` 指定币数量
+- MKT 订单使用 IOC (Immediate Or Cancel) 时效
+- **IBKR/Paxos 有特定交易时间**，周末可能关闭，周一 03:00 ET 开盘
+
 ### 账户余额
 
 ```bash
