@@ -399,8 +399,11 @@ class Z120ScheduledMonitor:
             return {}
 
     def calculate_zscore(self, spread_values: List[float]) -> Dict[str, Any]:
-        """计算 Z120（不管有多少条都用上）"""
+        """计算 Z120，只用最近120个点"""
         import numpy as np
+
+        # 只取最近120个点
+        spread_values = spread_values[:120]
 
         if len(spread_values) < 2:
             return {
