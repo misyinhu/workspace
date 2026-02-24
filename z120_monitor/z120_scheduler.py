@@ -359,35 +359,39 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
                     f"  ⚠️ {pair_name}: 只有{len(common_timestamps)}个数据点（需要1000个）"
                 )
 
-            # 计算价差并保存（先清空旧数据）
-            # 清空该pair的旧历史数据
+            # 计算价差并保存（批量写入避免并发冲突）
             import json
             from z120_cache import CACHE_FILE
+            
+            # 加载现有数据并清空该pair的历史
             if CACHE_FILE.exists():
                 try:
                     with open(CACHE_FILE) as f:
                         data = json.load(f)
-                    if pair_name in data:
-                        data[pair_name]["history"] = []
-                        with open(CACHE_FILE, "w") as f:
-                            json.dump(data, f, indent=2)
-                except: pass
+                except:
+                    data = {}
+            else:
+                data = {}
             
-            count = 0
+            if pair_name not in data:
+                data[pair_name] = {"history": []}
+            else:
+                data[pair_name]["history"] = []
+            
+            # 批量追加所有历史记录
             for ts in common_timestamps:
                 spread = price_map1[ts] * mult1 - price_map2[ts] * mult2
                 dt = datetime.fromtimestamp(ts)
-                save_status(
-                    pair_name=pair_name,
-                    zscore=None,
-                    spread=spread,
-                    mean=0,
-                    std=0,
-                    threshold=pair_config.get("threshold", 0),
-                    timestamp=dt,
-                )
-                count += 1
-
+                data[pair_name]["history"].append({
+                    "timestamp": dt.isoformat(),
+                    "spread": spread,
+                })
+            
+            # 一次性写回
+            with open(CACHE_FILE, "w") as f:
+                json.dump(data, f, indent=2)
+            
+            count = len(common_timestamps)
             print(f"  ✅ {pair_name}: 已保存 {count} 条历史价差数据")
             return count
 
