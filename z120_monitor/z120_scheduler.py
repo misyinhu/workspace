@@ -210,9 +210,9 @@ def get_latest_spreads(pairs_config: Dict) -> Dict[str, float]:
 
 
 def rebuild_history_if_needed(pairs_config: Dict) -> bool:
-    """检查历史数据完整性，不足100条则自动获取7天历史数据重建
+    """检查历史数据完整性，不足100条则自动获取10天历史数据重建
     
-    检查最近10小时（约120个5分钟数据点）实际有多少数据，不足100条则重建
+    检查最近10小时（约120个5分钟数据点）实际有多少数据，不足1000条则重建
     """
     from z120_cache import get_cached_status, save_status
     from client.ibkr_client import get_client_id, IBKR_HOST, IBKR_PORT
@@ -239,13 +239,13 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
         ]
         latest_count = len(recent_data)
         
-        if latest_count >= 100:
+        if latest_count >= 1000:
             print(f"  ✅ {pair_name}: 最近10小时有 {latest_count} 条数据")
         else:
             # 显示最后一条数据的时间，帮助调试
             last_ts = history[-1]['timestamp'] if history else '无数据'
             print(
-                f"  ⚠️ {pair_name}: 最近10小时只有 {latest_count} 条数据（需要 {100 - latest_count} 条）"
+                f"  ⚠️ {pair_name}: 最近10小时只有 {latest_count} 条数据（需要 {1000 - latest_count} 条）"
                 f"，最后数据时间: {last_ts}"
             )
             needs_rebuild.append((pair_name, pair_config))
@@ -254,12 +254,12 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
         print(f"  ✅ 所有交易对历史数据完整")
         return False
 
-    print(f"\n📥 开始获取7天历史数据（{len(needs_rebuild)}个交易对）...")
+    print(f"\n📥 开始获取10天历史数据（{len(needs_rebuild)}个交易对）...")
 
     nest_asyncio.apply()
 
-    async def fetch_48d_history(pair_name, pair_config):
-        """获取单个交易对48天历史数据并计算价差"""
+    async def fetch_7d_history(pair_name, pair_config):
+        """获取单个交易对10天历史数据并计算价差"""
         assets = pair_config.get("assets", [])
         if len(assets) < 2:
             print(f"  ❌ {pair_name}: 资产配置不足")
@@ -270,7 +270,7 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
             client_id = get_client_id()
             await ib.connectAsync(IBKR_HOST, IBKR_PORT, clientId=client_id)
 
-            # 获取资产1的48天历史数据
+            # 获取资产1的10天历史数据
             a1 = assets[0]
             if a1.get("sec_type") == "FUT" and a1.get("local_symbol"):
                 c1 = Future(
@@ -296,7 +296,7 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
                 formatDate=1,
             )
 
-            # 获取资产2的48天历史数据
+            # 获取资产2的10天历史数据
             a2 = assets[1]
             if a2.get("sec_type") == "FUT" and a2.get("local_symbol"):
                 c2 = Future(
@@ -346,18 +346,18 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
             price_map1 = {get_timestamp(bar.date): bar.close for bar in bars1}
             price_map2 = {get_timestamp(bar.date): bar.close for bar in bars2}
 
-            # 找到共同的时间戳（只保留最近的48小时）
+            # 找到共同的时间戳，并按时间顺序排序，限制在最近10天内（约2016个5分钟数据点）
             now_ts = datetime.now().timestamp()
-            cutoff_ts = now_ts - 7 * 24 * 3600
+            cutoff_ts = now_ts - 10 * 24 * 3600
             common_timestamps = sorted(
                 ts
                 for ts in set(price_map1.keys()) & set(price_map2.keys())
                 if ts >= cutoff_ts
             )
 
-            if len(common_timestamps) < 100:
+            if len(common_timestamps) < 1000:
                 print(
-                    f"  ⚠️ {pair_name}: 只有{len(common_timestamps)}个数据点（需要100个）"
+                    f"  ⚠️ {pair_name}: 只有{len(common_timestamps)}个数据点（需要1000个）"
                 )
 
             # 计算价差并保存
@@ -389,7 +389,7 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
 
     total_added = 0
     for pair_name, pair_config in needs_rebuild:
-        count = loop.run_until_complete(fetch_48d_history(pair_name, pair_config))
+        count = loop.run_until_complete(fetch_7d_history(pair_name, pair_config))
         total_added += count
         time.sleep(1)  # 避免请求过快
 
@@ -520,7 +520,7 @@ class Z120ScheduledMonitor:
         print(f"🕐 Z120 监控运行 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"{'=' * 60}")
 
-        # 先检查历史数据完整性，不足100条则重建
+        # 先检查历史数据完整性，不足1000条则重建
         rebuild_history_if_needed(self.pairs_config)
 
         latest_spreads = get_latest_spreads(self.pairs_config)
