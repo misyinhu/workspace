@@ -55,10 +55,16 @@ def save_ib_state(state: dict):
         json.dump(state, f, indent=2)
 
 def send_feishu_alert(msg: str):
-    import subprocess
+    """发送飞书警报 - 使用本地 feishu 模块"""
     try:
-        subprocess.run(["python3", "/Users/wang/.config/opencode/skills/feishu-notifier/scripts/send_message.py", "--method", "api", "--type", "text", "--content", msg], capture_output=True, timeout=30)
-    except: pass
+        # 添加项目根目录到 path
+        project_root = Path(__file__).parent.parent
+        sys.path.insert(0, str(project_root))
+        from notify.feishu import FeishuNotifier
+        notifier = FeishuNotifier()
+        notifier.send_message(msg)
+    except Exception as e:
+        print(f"  ⚠️ 飞书通知发送失败: {e}")
 
 def manage_ib_alerts(connected: bool):
     now = datetime.now()
