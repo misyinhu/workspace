@@ -5,6 +5,7 @@ Z120 监控调度器
 """
 
 import sys
+import logging
 import os
 import time
 import threading
@@ -19,7 +20,18 @@ BASE_DIR = Path(__file__).parent
 sys.path.insert(0, str(BASE_DIR))
 sys.path.insert(0, str(BASE_DIR / ".."))
 
-# 确保使用正确的 Python 环境（虚拟环境支持）
+
+# 配置文件日志
+LOG_FILE = Path(__file__).parent.parent / "logs" / "z120.log"
+LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler()
+    ]
+)# 确保使用正确的 Python 环境（虚拟环境支持）
 try:
     from config.env_config import ensure_venv
     ensure_venv()
@@ -544,13 +556,15 @@ class Z120ScheduledMonitor:
         # IB 连接告警
         manage_ib_alerts(len(latest_spreads) > 0)
         print(f"\n✅ 获取到 {len(latest_spreads)} 个交易对的当前价差")
-
+        logging.info(f"获取到 {len(latest_spreads)}/{len(self.pairs_config)} 个交易对的当前价差: {list(latest_spreads.keys())}")
         for pair_name, pair_config in self.pairs_config.items():
             print(f"\n📊 检查交易对: {pair_name}")
 
             current_spread = latest_spreads.get(pair_name)
             if current_spread is None:
                 print(f"  ❌ 无法获取当前价差")
+                logging.warning(f"{pair_name}: 无法获取当前价差")
+                send_feishu_alert(f"⚠️ Z120监控: {pair_name} 无法获取当前价差")
                 continue
 
             pair_threshold = pair_config.get("threshold", 0)
@@ -582,7 +596,7 @@ class Z120ScheduledMonitor:
 
             signal = self.get_signal(zscore, oversold, overbought)
             print(f"  🚦 Signal: {signal['signal']}")
-
+            logging.info(f"{pair_name}: 价差={current_spread:.2f}, Z120={zscore}, Signal={signal["signal"]}")
             # 只有当获取到实时价差时才保存（避免重复保存相同值）
             if CACHE_ENABLED and current_spread is not None:
                 from z120_cache import get_cached_status
