@@ -184,26 +184,43 @@ def get_latest_spreads(pairs_config: Dict) -> Dict[str, float]:
 
 
 def rebuild_history_if_needed(pairs_config: Dict) -> bool:
-    """检查历史数据完整性，不足100条则自动获取7天历史数据重建"""
+    """检查历史数据完整性，不足100条则自动获取7天历史数据重建
+    
+    检查最近10小时（约120个5分钟数据点）实际有多少数据，不足100条则重建
+    """
     from z120_cache import get_cached_status, save_status
     from client.ibkr_client import get_client_id, IBKR_HOST, IBKR_PORT
     import asyncio
     import nest_asyncio
     from ib_insync import IB, Stock, Future
     import numpy as np
+    from datetime import timedelta
 
     print(f"\n🔍 检查历史数据完整性...")
 
+    # 10小时前的时间戳（用于过滤）
+    ten_hours_ago = datetime.now() - timedelta(hours=10)
+    
     needs_rebuild = []
     for pair_name, pair_config in pairs_config.items():
         cached = get_cached_status(pair_name)
         history = cached.get("history", []) if cached else []
-
-        if len(history) >= 100:
-            print(f"  ✅ {pair_name}: 已有 {len(history)} 条历史数据")
+        
+        # 按时间范围筛选最近10小时的数据
+        recent_data = [
+            h for h in history 
+            if datetime.fromisoformat(h['timestamp']) >= ten_hours_ago
+        ]
+        latest_count = len(recent_data)
+        
+        if latest_count >= 100:
+            print(f"  ✅ {pair_name}: 最近10小时有 {latest_count} 条数据")
         else:
+            # 显示最后一条数据的时间，帮助调试
+            last_ts = history[-1]['timestamp'] if history else '无数据'
             print(
-                f"  ⚠️ {pair_name}: 只有 {len(history)} 条历史数据（需要 {100 - len(history)} 条）"
+                f"  ⚠️ {pair_name}: 最近10小时只有 {latest_count} 条数据（需要 {100 - latest_count} 条）"
+                f"，最后数据时间: {last_ts}"
             )
             needs_rebuild.append((pair_name, pair_config))
 
