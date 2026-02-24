@@ -84,6 +84,32 @@ def manage_ib_alerts(connected: bool):
                 state["alert_sent"] = True
     save_ib_state(state)
 
+# 7日价差阈值告警追踪（防止同一天重复通知）
+SPREAD_ALERT_FILE = Path(__file__).parent / ".." / "data" / "spread_alert_state.json"
+
+def get_spread_alert_state() -> dict:
+    if SPREAD_ALERT_FILE.exists():
+        try:
+            with open(SPREAD_ALERT_FILE) as f:
+                return json.load(f)
+        except: pass
+    return {}
+
+def should_send_spread_alert(pair_name: str) -> bool:
+    today = datetime.now().strftime("%Y-%m-%d")
+    state = get_spread_alert_state()
+    last_alert_date = state.get(pair_name, {}).get("last_date")
+    if last_alert_date == today:
+        return False
+    return True
+
+def record_spread_alert(pair_name: str):
+    today = datetime.now().strftime("%Y-%m-%d")
+    state = get_spread_alert_state()
+    state[pair_name] = {"last_date": today}
+    SPREAD_ALERT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(SPREAD_ALERT_FILE, 'w') as f:
+        json.dump(state, f, indent=2)
 
 def get_latest_spreads(pairs_config: Dict) -> Dict[str, float]:
     """一次 IB 连接获取所有交易对的当前价差"""
@@ -561,17 +587,23 @@ class Z120ScheduledMonitor:
                 else:
                     print(f"  💾 价差无变化，跳过保存")
 
-            # 检查7天价差变化
+            # 检查7天价差变化（防止同一天重复通知）
             spread_alert = False
             if pair_threshold > 0 and CACHE_ENABLED and get_spread_change:
                 change_info = get_spread_change(pair_name, days=7)
                 change = change_info.get("change", 0)
                 if abs(change) > pair_threshold:
-                    direction = "↗️" if change > 0 else "↘️"
-                    print(
-                        f"  🚨 7天价差变化{direction}: {change:.0f} (阈值: ±{pair_threshold})"
-                    )
-                    spread_alert = True
+                    # 检查今天是否已经发送过7日价差告警
+                    if should_send_spread_alert(pair_name):
+                        direction = "↗️" if change > 0 else "↘️"
+                        print(
+                            f"  🚨 7天价差变化{direction}: {change:.0f} (阈值: ±{pair_threshold})"
+                        )
+                        spread_alert = True
+                    else:
+                        print(
+                            f"  ⏭️ 7天价差变化超阈值，但今日已通知，跳过"
+                        )
 
             # 发送飞书通知
             if (
