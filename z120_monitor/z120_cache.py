@@ -10,7 +10,7 @@ from typing import Optional
 CACHE_DIR = Path(__file__).parent / ".." / "data"
 CACHE_DIR.mkdir(exist_ok=True)
 CACHE_FILE = CACHE_DIR / "z120_status.json"
-MAX_HISTORY_DAYS = 14
+MAX_HISTORY_DAYS = 10
 
 
 def save_status(
@@ -41,7 +41,7 @@ def save_status(
         if pair_name not in data:
             data[pair_name] = {"history": []}
 
-        # 如果不是自定义时间戳（实时保存），则清理7天前的旧数据
+        # 如果不是自定义时间戳（实时保存），则清理10天前的旧数据
         if timestamp is None:
             cutoff = (datetime.now() - timedelta(days=MAX_HISTORY_DAYS)).isoformat()
             data[pair_name]["history"] = [

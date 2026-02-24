@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
+MAX_HISTORY_DAYS = 10
 BASE_DIR = Path(__file__).parent
 sys.path.insert(0, str(BASE_DIR))
 sys.path.insert(0, str(BASE_DIR / ".."))
@@ -210,9 +211,7 @@ def get_latest_spreads(pairs_config: Dict) -> Dict[str, float]:
 
 
 def rebuild_history_if_needed(pairs_config: Dict) -> bool:
-    """检查历史数据完整性，不足100条则自动获取10天历史数据重建
-    
-    检查最近10小时（约120个5分钟数据点）实际有多少数据，不足1000条则重建
+    """检查历史数据完整性，不足1000条则自动获取10天历史数据重建
     """
     from z120_cache import get_cached_status, save_status
     from client.ibkr_client import get_client_id, IBKR_HOST, IBKR_PORT
@@ -224,28 +223,28 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
 
     print(f"\n🔍 检查历史数据完整性...")
 
-    # 10小时前的时间戳（用于过滤）
-    ten_hours_ago = datetime.now() - timedelta(hours=10)
+    # 10天前的时间戳（用于过滤）
+    ten_days_ago = datetime.now() - timedelta(days=MAX_HISTORY_DAYS)
     
     needs_rebuild = []
     for pair_name, pair_config in pairs_config.items():
         cached = get_cached_status(pair_name)
         history = cached.get("history", []) if cached else []
         
-        # 按时间范围筛选最近10小时的数据
+        # 按时间范围筛选最近10天的数据
         recent_data = [
             h for h in history 
-            if datetime.fromisoformat(h['timestamp']) >= ten_hours_ago
+            if datetime.fromisoformat(h['timestamp']) >= ten_days_ago
         ]
         latest_count = len(recent_data)
         
         if latest_count >= 1000:
-            print(f"  ✅ {pair_name}: 最近10小时有 {latest_count} 条数据")
+            print(f"  ✅ {pair_name}: 最近10天有 {latest_count} 条数据")
         else:
             # 显示最后一条数据的时间，帮助调试
             last_ts = history[-1]['timestamp'] if history else '无数据'
             print(
-                f"  ⚠️ {pair_name}: 最近10小时只有 {latest_count} 条数据（需要 {1000 - latest_count} 条）"
+                f"  ⚠️ {pair_name}: 最近10天只有 {latest_count} 条数据（需要 {1000 - latest_count} 条）"
                 f"，最后数据时间: {last_ts}"
             )
             needs_rebuild.append((pair_name, pair_config))
@@ -258,7 +257,7 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
 
     nest_asyncio.apply()
 
-    async def fetch_7d_history(pair_name, pair_config):
+    async def fetch_history(pair_name, pair_config):
         """获取单个交易对10天历史数据并计算价差"""
         assets = pair_config.get("assets", [])
         if len(assets) < 2:
@@ -315,7 +314,7 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
             bars2 = ib.reqHistoricalData(
                 c2,
                 endDateTime="",
-                durationStr="7 D",
+                durationStr="10 D",
                 barSizeSetting="5 mins",
                 whatToShow="TRADES",
                 useRTH=False,
@@ -360,7 +359,20 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
                     f"  ⚠️ {pair_name}: 只有{len(common_timestamps)}个数据点（需要1000个）"
                 )
 
-            # 计算价差并保存
+            # 计算价差并保存（先清空旧数据）
+            # 清空该pair的旧历史数据
+            import json
+            from z120_cache import CACHE_FILE
+            if CACHE_FILE.exists():
+                try:
+                    with open(CACHE_FILE) as f:
+                        data = json.load(f)
+                    if pair_name in data:
+                        data[pair_name]["history"] = []
+                        with open(CACHE_FILE, "w") as f:
+                            json.dump(data, f, indent=2)
+                except: pass
+            
             count = 0
             for ts in common_timestamps:
                 spread = price_map1[ts] * mult1 - price_map2[ts] * mult2
@@ -389,13 +401,13 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
 
     total_added = 0
     for pair_name, pair_config in needs_rebuild:
-        count = loop.run_until_complete(fetch_7d_history(pair_name, pair_config))
+        count = loop.run_until_complete(fetch_history(pair_name, pair_config))
         total_added += count
         time.sleep(1)  # 避免请求过快
 
     loop.close()
 
-    print(f"\n✅ 历史数据重建完成（2天），共 {total_added} 条记录")
+    print(f"\n✅ 历史数据重建完成（{MAX_HISTORY_DAYS}天），共 {total_added} 条记录")
     return total_added > 0
 
 
@@ -454,7 +466,7 @@ class Z120ScheduledMonitor:
         # 只取最近120个点
         spread_values = spread_values[-120:]
 
-        if len(spread_values) < 2:
+        if len(spread_values) < 20:
             return {
                 "zscore": None,
                 "mean": None,
@@ -540,14 +552,14 @@ class Z120ScheduledMonitor:
             oversold = pair_config.get("oversold", 0.0)
             overbought = pair_config.get("overbought", 0.0)
 
-            # 从缓存读取历史价差（按7天时间范围筛选）
+            # 从缓存读取历史价差（按10天时间范围筛选）
             spread_history = None
             zresult = None
             zscore = None
 
             if CACHE_ENABLED and get_cached_spread_history:
-                spread_history = get_cached_spread_history(pair_name, days=7)
-                if spread_history and len(spread_history) >= 10:
+                spread_history = get_cached_spread_history(pair_name, days=MAX_HISTORY_DAYS)
+                if spread_history and len(spread_history) >= MAX_HISTORY_DAYS:
                     zresult = self.calculate_zscore(spread_history)
                     zscore = zresult.get("zscore")
 
