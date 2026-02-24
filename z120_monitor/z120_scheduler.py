@@ -600,6 +600,8 @@ class Z120ScheduledMonitor:
                             f"  🚨 7天价差变化{direction}: {change:.0f} (阈值: ±{pair_threshold})"
                         )
                         spread_alert = True
+                        # 记录警报，防止同一天重复通知
+                        record_spread_alert(pair_name)
                     else:
                         print(
                             f"  ⏭️ 7天价差变化超阈值，但今日已通知，跳过"
