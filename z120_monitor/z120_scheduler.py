@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 MAX_HISTORY_DAYS = 10
+MIN_DATA_COUNT = 500
 BASE_DIR = Path(__file__).parent
 sys.path.insert(0, str(BASE_DIR))
 sys.path.insert(0, str(BASE_DIR / ".."))
@@ -211,7 +212,7 @@ def get_latest_spreads(pairs_config: Dict) -> Dict[str, float]:
 
 
 def rebuild_history_if_needed(pairs_config: Dict) -> bool:
-    """检查历史数据完整性，不足1000条则自动获取10天历史数据重建
+    """检查历史数据完整性，不足500条则自动获取10天历史数据重建
     """
     from z120_cache import get_cached_status, save_status
     from client.ibkr_client import get_client_id, IBKR_HOST, IBKR_PORT
@@ -238,13 +239,13 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
         ]
         latest_count = len(recent_data)
         
-        if latest_count >= 1000:
+        if latest_count >= MIN_DATA_COUNT:
             print(f"  ✅ {pair_name}: 最近10天有 {latest_count} 条数据")
         else:
             # 显示最后一条数据的时间，帮助调试
             last_ts = history[-1]['timestamp'] if history else '无数据'
             print(
-                f"  ⚠️ {pair_name}: 最近10天只有 {latest_count} 条数据（需要 {1000 - latest_count} 条）"
+                f"  ⚠️ {pair_name}: 最近10天只有 {latest_count} 条数据（需要 {MIN_DATA_COUNT - latest_count} 条）"
                 f"，最后数据时间: {last_ts}"
             )
             needs_rebuild.append((pair_name, pair_config))
@@ -354,9 +355,9 @@ def rebuild_history_if_needed(pairs_config: Dict) -> bool:
                 if ts >= cutoff_ts
             )
 
-            if len(common_timestamps) < 1000:
+            if len(common_timestamps) < MIN_DATA_COUNT:
                 print(
-                    f"  ⚠️ {pair_name}: 只有{len(common_timestamps)}个数据点（需要1000个）"
+                    f"  ⚠️ {pair_name}: 只有{len(common_timestamps)}个数据点（需要{MIN_DATA_COUNT}个）"
                 )
 
             # 计算价差并保存（批量写入避免并发冲突）
