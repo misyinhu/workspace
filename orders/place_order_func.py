@@ -17,6 +17,8 @@ from ib_insync import (
     StopLimitOrder,
 )
 
+from orders.exchange_mapper import get_exchange_for_symbol
+
 
 def get_position_contract(ib, symbol, action=None):
     try:
@@ -159,19 +161,18 @@ def place_order(
     tif: str = "DAY",
 ) -> Dict[str, Any]:
     # 自动检测 sec_type 和 exchange
-    futures = {"GC", "ES", "NQ", "YM", "ZB", "ZN"}
+    futures = {"GC", "MGC", "ES", "MES", "NQ", "MNQ", "YM", "MYM", "ZB", "ZN"}
     crypto = {"BTC", "ETH", "DOGE"}
     if sec_type is None:
         sec_type = "FUT" if symbol in futures else "CRYPTO" if symbol in crypto else "STK"
     if exchange is None:
-        if symbol == "GC":
-            exchange = "COMEX"
-        elif symbol in futures:
+        if symbol == "GC" or symbol == "MGC":
             exchange = "COMEX"
         elif symbol in crypto:
             exchange = "PAXOS"
         else:
-            exchange = "SMART"
+            # 使用 ExchangeMapper 自动获取交易所
+            exchange = get_exchange_for_symbol(symbol, sec_type)
     
     result = {}
     

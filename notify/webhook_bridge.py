@@ -206,6 +206,7 @@ def send_feishu(text, receive_id=None):
     """发送消息到飞书"""
     token = get_tenant_token()
     if not token:
+        print("[FEISHU] Error: No token available")
         return False, "No token"
 
     target_id = receive_id or FEISHU_CONVERSATION_ID
@@ -530,8 +531,13 @@ def feishu_webhook():
                                     send_feishu(f"ℹ️ {symbol} 无持仓，已取消挂单", chat_id)
                             else:
                                 from orders.place_order_func import place_order
-                                result = place_order(ib, symbol, action, quantity)
-                                send_feishu(f"{action} {quantity} 手 {symbol}: {result}", chat_id)
+                                from orders.exchange_mapper import get_exchange_for_symbol
+                                
+                                # 使用 ExchangeMapper 自动获取正确的交易所
+                                exchange = get_exchange_for_symbol(symbol, "FUT")
+                                
+                                result = place_order(ib, symbol, action, quantity, exchange=exchange)
+                                send_feishu(f"{action} {quantity} 手 {symbol} ({exchange}): {result}", chat_id)
                             loop.close()
                         except Exception as e:
                             import traceback
