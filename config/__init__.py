@@ -19,6 +19,9 @@ def load_config(config_path: str = None) -> Dict[str, Any]:
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             _config = yaml.safe_load(f) or {}
+            # 从配置加载 query_only
+            global _query_only
+            _query_only = _config.get("query_only", _query_only)
             return _config
     except Exception as e:
         print(f"加载配置失败: {e}")
@@ -112,3 +115,18 @@ def get_project_root() -> str:
     if project_root:
         return str(project_root)
     return os.path.dirname(os.path.dirname(__file__))
+
+
+def get_volcengine_config() -> Dict[str, Any]:
+    """获取火山引擎配置"""
+    return {
+        "api_key": get("volcengine.api_key", ""),
+        "base_url": get("volcengine.base_url", "https://ark.cn-beijing.volces.com/api/coding/v3"),
+        "model": get("volcengine.model", "doubao-seed-2.0-code"),
+        "enabled": get("volcengine.enabled", False),
+    }
+
+
+def is_volcengine_enabled() -> bool:
+    """检查火山引擎是否启用"""
+    return get("volcengine.enabled", False)

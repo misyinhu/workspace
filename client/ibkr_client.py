@@ -110,11 +110,18 @@ def is_web_environment():
 
 def get_client_id():
     """获取clientId
-    - Web环境: 返回 0
-    - Z120环境: 返回 1
-    - 其他: 动态分配 2-10
+    通过环境变量 IB_SERVICE_NAME 指定服务:
+    - webhook: 0
+    - z120: 1
+    - 其他: 2-9 动态分配
     """
-    # 检测 Z120 环境（通过环境变量或进程名）
+    service = os.environ.get("IB_SERVICE_NAME")
+    if service == "webhook":
+        return 0
+    if service == "z120":
+        return 1
+
+    # 如果未指定，尝试检测
     if os.environ.get("IB_ENV_TYPE") == "z120":
         return 1
     
@@ -122,7 +129,6 @@ def get_client_id():
     try:
         current_pid = os.getpid()
         parent = psutil.Process(current_pid)
-        # 检查进程名或命令行是否包含 z120
         cmdline = " ".join(parent.cmdline() or [])
         if "z120_scheduler" in cmdline or "z120_monitor" in cmdline:
             return 1

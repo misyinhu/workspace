@@ -29,9 +29,18 @@ try:
         "inactive": [],  # 未激活
     }
 
-    for trade in ib.trades():
+    for i, trade in enumerate(ib.trades()):
         os = trade.orderStatus
         c = trade.contract
+
+        print(f"DEBUG TRADE {i}: orderId={trade.order.orderId}"
+              f" contract={c}"
+              f" action={trade.order.action}"
+              f" totalQuantity={trade.order.totalQuantity}"
+              f" filled={os.filled}"
+              f" remaining={os.remaining}"
+              f" avgFillPrice={os.avgFillPrice}"
+              f" status={os.status}", file=sys.stderr)
 
         order_info = {
             "orderId": trade.order.orderId,
@@ -65,28 +74,28 @@ try:
 
     # 打印分类结果
     print("\n" + "=" * 60)
-    print("📋 订单状态汇总")
+    print("订单状态汇总")
     print("=" * 60)
 
-    print(f"\n🔄 待成交 ({len(orders_by_status['pending'])} 单)")
+    print(f"\n待成交 ({len(orders_by_status['pending'])} 单)")
     for o in orders_by_status["pending"]:
         print(
             f"  {o['symbol']:8} | {o['action']:4} | {o['status']:12} | {o['filled']:.1f}/{o['quantity']}"
         )
 
-    print(f"\n✅ 已成交 ({len(orders_by_status['filled'])} 单)")
+    print(f"\n已成交 ({len(orders_by_status['filled'])} 单)")
     for o in orders_by_status["filled"]:
         print(
             f"  {o['symbol']:8} | {o['action']:4} | {o['status']:12} | {o['filled']:.1f}/{o['quantity']} @ ${o['avgFillPrice']:.2f}"
         )
 
-    print(f"\n❌ 已取消 ({len(orders_by_status['cancelled'])} 单)")
+    print(f"\n已取消 ({len(orders_by_status['cancelled'])} 单)")
     for o in orders_by_status["cancelled"]:
         print(
             f"  {o['symbol']:8} | {o['action']:4} | {o['status']:12} | {o['filled']:.1f}/{o['quantity']}"
         )
 
-    print(f"\n⚪ 未激活 ({len(orders_by_status['inactive'])} 单)")
+    print(f"\n未激活 ({len(orders_by_status['inactive'])} 单)")
     for o in orders_by_status["inactive"]:
         print(
             f"  {o['symbol']:8} | {o['action']:4} | {o['status']:12} | {o['filled']:.1f}/{o['quantity']}"

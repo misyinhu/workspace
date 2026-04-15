@@ -1,0 +1,25 @@
+# OKX API 配置
+# 机器人使用模拟盘 (flag="1")
+
+okx:
+  # 交易模式: 0=实盘, 1=模拟盘
+  flag: "1"
+  
+  # 模拟盘 API 密钥
+  sim:
+    apikey: "7c1d51b0-0104-476c-90db-c6dff1f0b090"
+    secretkey: "AF8EB679F8AA4CE9A38C5069CB0737A7"
+    passphrase: "AbcD@1234"
+  
+  # 实盘 API 密钥
+  live:
+    apikey: "580296ac-679c-451e-ae3d-4a871e1300f8"
+    secretkey: "3E13B35DB1EEBA2CA824C53652DB67B1"
+    passphrase: "AbcD@1234"
+  
+  # 交易对配置
+  pairs:
+    - symbol: "DOGE-USDT"
+      min_size: 1
+    - symbol: "ETH-USDT"
+      min_size: 0.01

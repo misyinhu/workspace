@@ -1,0 +1,12 @@
+default_profile = "demo"
+
+[profiles.live]
+api_key    = "f74131b4-a111-4ee4-8e9d-e5e52d7f395f"
+secret_key = "BD9FDEDF622C605F94AAB91FE8846B7F"
+passphrase = "AbcD@1234"
+
+[profiles.demo]
+api_key    = "7c1d51b0-0104-476c-90db-c6dff1f0b090"
+secret_key = "AF8EB679F8AA4CE9A38C5069CB0737A7"
+passphrase = "AbcD@1234"
+demo       = true

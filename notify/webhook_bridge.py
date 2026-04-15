@@ -19,6 +19,8 @@ import yaml
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 sys.path.insert(0, PROJECT_ROOT)
 from config import load_config, is_query_only, set_query_only, get_webhook_port, get_project_root
+from client.ib_connection import get_ib_connection
+from notify.nl_parser import parse_trading_command
 
 # 加载主配置
 load_config()
@@ -355,7 +357,7 @@ def tv_webhook():
             # 构建命令
             cmd = [
                 get_python_cmd(),
-                str(Path(PROJECT_ROOT) / "orders" / "place_order.py"),
+                str(Path(PROJECT_ROOT) / "orders" / "place_order_func.py"),
                 "--symbol", symbol,
                 "--action", action,
                 "--quantity", str(quantity),
@@ -427,6 +429,21 @@ def feishu_webhook():
             event_data = event.get("event", event.get("body", {}))
             message = event_data.get("message", {})
 
+            # 去重：检查 message_id
+            msg_id = message.get("message_id", "")
+            if msg_id:
+                cache_key = f"feishu_msg_{msg_id}"
+                import time
+                current_time = int(time.time())
+                if not hasattr(feishu_webhook, "_msg_cache"):
+                    feishu_webhook._msg_cache = {}
+                # 5秒内重复消息跳过
+                if cache_key in feishu_webhook._msg_cache:
+                    if current_time - feishu_webhook._msg_cache[cache_key] < 5:
+                        logger.info(f"[FEISHU] Duplicate message: {msg_id}, skip")
+                        return jsonify({"status": "ok"}), 200
+                feishu_webhook._msg_cache[cache_key] = current_time
+            
             logger.info(f"[FEISHU] Message: {json.dumps(message, ensure_ascii=False)}")
 
             content_raw = message.get("content", "{}")
@@ -484,8 +501,45 @@ def feishu_webhook():
                     output = COMMANDS[matched_cmd]()
                     success, resp = send_feishu(f"**{cmd_key}**\n\n{output}", chat_id)
                 else:
-                    # 未识别的命令，显示帮助
-                    send_feishu(get_help_text(), chat_id)
+                    action, symbol, quantity = parse_trading_command(text)
+                    if action:
+                        try:
+                            logger.info(f"[FEISHU] NL parsed: action={action}, symbol={symbol}, qty={quantity}")
+                            import asyncio
+                            from ib_insync import MarketOrder
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                            ib = get_ib_connection()
+                            if action == "CLOSE":
+                                positions = ib.positions()
+                                pos = None
+                                for p in positions:
+                                    if p.contract.symbol == symbol:
+                                        pos = p
+                                        break
+                                if pos and pos.position > 0:
+                                    order = MarketOrder(action="SELL", totalQuantity=abs(pos.position))
+                                    trade = ib.placeOrder(pos.contract, order)
+                                    ib.sleep(2)
+                                    result = {"symbol": symbol, "action": "SELL", "quantity": abs(pos.position), "status": trade.orderStatus.status}
+                                    send_feishu(f"✅ 平仓 {symbol} {abs(pos.position)} 手\n\n{result}", chat_id)
+                                else:
+                                    for o in ib.openOrders():
+                                        if o.contract.symbol == symbol:
+                                            ib.cancelOrder(o.order)
+                                    send_feishu(f"ℹ️ {symbol} 无持仓，已取消挂单", chat_id)
+                            else:
+                                from orders.place_order_func import place_order
+                                result = place_order(ib, symbol, action, quantity)
+                                send_feishu(f"{action} {quantity} 手 {symbol}: {result}", chat_id)
+                            loop.close()
+                        except Exception as e:
+                            import traceback
+                            err = traceback.format_exc()
+                            logger.info(f"[FEISHU] Trade error: {e}\n{err}")
+                            send_feishu(f"❌ 下单失败: {e}", chat_id)
+                    else:
+                        send_feishu(get_help_text(), chat_id)
 
         return jsonify({"status": "ok"}), 200
     except Exception as e:
@@ -511,6 +565,27 @@ def health():
         "query_only": QUERY_ONLY,
     }
     return jsonify({"status": "ok", "config": config_status})
+
+
+@app.route("/positions", methods=["GET"])
+def get_positions_api():
+    try:
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        ib = get_ib_connection()
+        positions = ib.positions()
+        result = []
+        for pos in positions:
+            result.append({
+                "symbol": pos.contract.symbol,
+                "position": pos.position,
+                "avgCost": pos.avgCost,
+            })
+        loop.close()
+        return jsonify({"status": "ok", "positions": result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
 
 
 if __name__ == "__main__":

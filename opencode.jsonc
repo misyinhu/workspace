@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "tv-mcp": {
+      "type": "local",
+      "command": ["/Users/wang/.local/bin/uvx", "--from", "tradingview-mcp-server", "tradingview-mcp"],
+      "enabled": true
+    }
+  }
+}
