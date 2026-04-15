@@ -502,8 +502,12 @@ def feishu_webhook():
                     output = COMMANDS[matched_cmd]()
                     success, resp = send_feishu(f"**{cmd_key}**\n\n{output}", chat_id)
                 else:
-                    action, symbol, quantity = parse_trading_command(text)
-                    if action:
+                    parsed = parse_trading_command(text)
+                    action = parsed.get('action')
+                    symbol = parsed.get('symbol')
+                    quantity = parsed.get('quantity')
+                    
+                    if action and action != 'UNKNOWN':
                         try:
                             logger.info(f"[FEISHU] NL parsed: action={action}, symbol={symbol}, qty={quantity}")
                             import asyncio
