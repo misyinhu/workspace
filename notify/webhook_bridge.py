@@ -51,10 +51,13 @@ def _init_ib():
 # 详细调试日志文件（写入 webhook_out.log）
 _DEBUG_LOG = os.path.join(os.path.dirname(__file__), "webhook_out.log")
 def _debug(msg):
-    with open(_DEBUG_LOG, "a", encoding="utf-8") as f:
-        import datetime
-        f.write(f"[{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] {msg}\n")
-    print(msg, flush=True)
+    try:
+        with open(_DEBUG_LOG, "a", encoding="utf-8") as f:
+            import datetime
+            f.write(f"[{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] {msg}\n")
+        print(msg, flush=True)
+    except Exception:
+        pass  # 忽略打印错误
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
@@ -91,12 +94,14 @@ Z120_PID_FILE = "/tmp/z120_monitor.pid"
 
 
 def get_python_cmd():
-    """获取 Python 命令（支持虚拟环境）"""
+    """获取 Python 命令（支持虚拟环境和 Windows）"""
+    import sys
     try:
         from config.env_config import get_python_path
         return get_python_path()
     except ImportError:
-        return "python3"
+        # Windows 使用 "python"，Unix 使用 "python3"
+        return "python" if sys.platform == "win32" else "python3"
 
 
 def get_z120_status():
@@ -502,32 +507,26 @@ def tv_webhook():
             use_main_contract = data.get("use_main_contract", True)
             limit_price = data.get("limit_price")
 
-            # 构建命令
-            cmd = [
-                get_python_cmd(),
-                str(Path(PROJECT_ROOT) / "orders" / "place_order_func.py"),
-                "--symbol", symbol,
-                "--action", action,
-                "--quantity", str(quantity),
-                "--order_type", order_type,
-            ]
-
-            if sec_type:
-                cmd.extend(["--sec_type", sec_type])
-            if exchange:
-                cmd.extend(["--exchange", exchange])
-            if use_main_contract:
-                cmd.append("--use_main_contract")
-            if limit_price:
-                cmd.extend(["--limit_price", str(limit_price)])
-            if data.get("stop_price"):
-                cmd.extend(["--stop_price", str(data.get("stop_price"))])
-
-            print(f"执行交易命令: {' '.join(cmd)}")
-
-            # 执行下单
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-            output = result.stdout + result.stderr
+            # 复用 IB 连接直接下单，避免 subprocess 创建新连接导致 clientId 冲突
+            exchange = get_exchange_for_symbol(symbol, "FUT") if sec_type == "FUT" else ""
+            
+            try:
+                from client.ib_connection import get_ib_connection
+                from orders.place_order_func import place_order
+                
+                ib = get_ib_connection()
+                if ib is None or not ib.isConnected():
+                    output = "IB 连接失败或已断开"
+                else:
+                    try:
+                        result = place_order(ib, symbol, action, quantity, exchange=exchange, close_position=(action == "CLOSE"))
+                        if asyncio.iscoroutine(result):
+                            result = asyncio.run(result)
+                        output = str(result)
+                    except Exception as inner_e:
+                        output = f"下单错误: {inner_e}"
+            except Exception as e:
+                output = f"错误: {e}"
 
             # 发送交易结果到飞书
             msg = f"🤖 Webhook 交易信号\n\n标的: {symbol}\n操作: {action}\n数量: {quantity}\n订单类型: {order_type}\n\n结果:\n{output[:500]}"

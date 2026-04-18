@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
 """下单交易 - 函数版本"""
 
-import json
 import sys
+import os
+
+# 添加项目根目录到 sys.path（支持直接运行）
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
+import json
 import time
 import traceback
 from typing import Optional, Dict, Any, Tuple

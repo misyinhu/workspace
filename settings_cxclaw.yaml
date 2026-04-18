@@ -1,0 +1,69 @@
+# 交易系统配置文件
+
+# 环境配置
+environments:
+  local:
+    python_path: /Users/wang/miniconda3/bin/python3
+    project_root: /Users/wang/.opencode/workspace/trading
+    use_venv: false
+    ib_port: 4002
+    feishu:
+      app_id: "cli_a9f5b420c9f85cca"
+      app_secret: "dD87XinteNoxupSbKimr9qkfQh6MVdAS"
+      api_endpoint: "https://open.feishu.cn/open-apis/im/v1/messages"
+      auth_endpoint: "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
+      chat_id: "oc_7455ec51aff3a187248914f978b834e3"
+      message_type: "text"
+      timeout: 30
+
+  remote:
+    python_path: /Users/openclaw/trading_env/bin/python3
+    project_root: /Users/openclaw/.openclaw/workspace/trading
+    use_venv: true
+    ib_port: 4001
+    ibkr_host: "127.0.0.1"
+    ibkr_port: 4001
+    feishu:
+      app_id: "cli_a90efe262cf99bd6"
+      app_secret: "ibSzkvdHwPh3Rcf342PPZYDzDOl4FrCJ"
+      api_endpoint: "https://open.feishu.cn/open-apis/im/v1/messages"
+      auth_endpoint: "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
+      chat_id: "oc_184cd41ff1e8bfc5588f1612d7ec1635"
+      message_type: "text"
+      timeout: 30
+
+  cxclaw:
+    python_path: C:/Users/Apple/AppData/Local/Programs/Python/Python312/python.exe
+    project_root: D:/projects/trading
+    use_venv: false
+    ib_port: 4002
+    ibkr_host: "100.82.238.11"
+    ibkr_port: 4002
+    feishu:
+      app_id: "cli_a9f5b420c9f85cca"
+      app_secret: "dD87XinteNoxupSbKimrariqkfQh6MVdAS"
+      api_endpoint: "https://open.feishu.cn/open-apis/im/v1/messages"
+      auth_endpoint: "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
+      chat_id: "oc_7455ec51aff3a187248914f978b834e3"
+      message_type: "text"
+      timeout: 30
+
+# 当前环境
+current: cxclaw
+
+# 查询模式
+query_only: false
+
+# 主合约配置
+contracts:
+  BTC: "BTC.USD"
+  GC: "GCM4"
+  ES: "ESH4"
+
+# Webhook 服务配置
+webhook:
+  port: 5002
+
+# 火山引擎豆包大模型配置（已禁用，改用规则匹配）
+volcengine:
+  enabled: false
