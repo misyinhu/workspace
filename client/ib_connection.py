@@ -32,7 +32,7 @@ class IBConnectionManager:
         self._ib: Optional[IB] = None
         self._host: str = get_ibkr_host()
         self._port: int = get_ibkr_port()
-        self._client_id: int = 0  # Webhook 使用 clientId=0
+        self._client_id: int = 55  # Webhook 使用 clientId=55
         self._connected: bool = False
         self._connection_lock = threading.Lock()
     

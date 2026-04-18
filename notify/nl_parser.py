@@ -25,6 +25,8 @@ TRADING_PATTERNS = [
     (r"买入(\d+)$", "BUY"),  # 买入1 = 买1手GC
     (r"买入(\S+)$", "BUY"),
     (r"做多(\S+)$", "BUY"),
+    (r"购买(\d+)(?:手|股)(\S+)$", "BUY"),
+    (r"购买(\S+)$", "BUY"),
 ]
 
 QUERY_PATTERNS = [

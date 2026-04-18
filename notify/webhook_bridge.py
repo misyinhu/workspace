@@ -6,10 +6,19 @@ TradingView Webhook -> 飞书 中转服务
 
 import os
 import sys
+
+# 首先应用 nest_asyncio patch（必须在导入 ib_insync 之前）
+try:
+    from ib_insync.util import patchAsyncio
+    patchAsyncio()
+except Exception:
+    pass
+
 import json
 import subprocess
 import time
 import logging
+import json
 from pathlib import Path
 from flask import Flask, request, jsonify
 import requests
@@ -24,6 +33,28 @@ from notify.nl_parser import parse_trading_command
 
 # 加载主配置
 load_config()
+
+# ============ 启动时预初始化 IB 连接 ============
+# 必须在 app.run() 前建立，否则第一个请求会卡在 connect(timeout=10) 里
+_ib_init_done = False
+def _init_ib():
+    global _ib_init_done
+    if _ib_init_done:
+        return
+    try:
+        ib = get_ib_connection()
+        print(f"[IB] pre-connect: {ib}, connected={ib.isConnected()}")
+    except Exception as e:
+        print(f"[IB] pre-connect failed (will retry on request): {e}")
+    _ib_init_done = True
+
+# 详细调试日志文件（写入 webhook_out.log）
+_DEBUG_LOG = os.path.join(os.path.dirname(__file__), "webhook_out.log")
+def _debug(msg):
+    with open(_DEBUG_LOG, "a", encoding="utf-8") as f:
+        import datetime
+        f.write(f"[{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] {msg}\n")
+    print(msg, flush=True)
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
@@ -176,19 +207,19 @@ def get_monitor_status():
 def get_tenant_token():
     """获取 tenant_access_token"""
     global _token_cache
-
+    
     if _token_cache["token"] and time.time() < _token_cache["expire"]:
         return _token_cache["token"]
-
+    
     url = feishu_config.get(
         "auth_endpoint",
         "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
     )
-    headers = {"Content-Type": "application/json"}
-    data = {"app_id": FEISHU_APP_ID, "app_secret": FEISHU_APP_SECRET}
-
+    headers = {"Content-Type": "application/json; charset=utf-8"}
+    payload = {"app_id": FEISHU_APP_ID, "app_secret": FEISHU_APP_SECRET}
+    
     try:
-        resp = requests.post(url, json=data, headers=headers, timeout=10)
+        resp = requests.post(url, headers=headers, json=payload, timeout=30)
         result = resp.json()
         if result.get("code") == 0:
             _token_cache["token"] = result["tenant_access_token"]
@@ -204,37 +235,47 @@ def get_tenant_token():
 
 def send_feishu(text, receive_id=None):
     """发送消息到飞书"""
-    token = get_tenant_token()
-    if not token:
-        print("[FEISHU] Error: No token available")
-        return False, "No token"
-
-    target_id = receive_id or FEISHU_CONVERSATION_ID
-
-    url = feishu_config.get(
-        "api_endpoint", "https://open.feishu.cn/open-apis/im/v1/messages"
-    )
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-    }
-    params = {"receive_id_type": "chat_id"}
-    message = {
-        "receive_id": target_id,
-        "msg_type": "text",
-        "content": json.dumps({"text": text}),
-    }
-
+    _debug(f"[FEISHU] send_feishu called: text={text[:50]}..., receive_id={receive_id}")
     try:
+        token = get_tenant_token()
+        _debug(f"[FEISHU] Token result: {token}")
+        if not token:
+            print("[FEISHU] Error: No token available")
+            return (False, "No token")
+
+        target_id = receive_id or FEISHU_CONVERSATION_ID
+        _debug(f"[FEISHU] target_id: {target_id}")
+        if not target_id:
+            print("[FEISHU] Error: No target_id available")
+            return (False, "No target_id")
+
+        url = feishu_config.get(
+            "api_endpoint", "https://open.feishu.cn/open-apis/im/v1/messages"
+        )
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+        params = {"receive_id_type": "chat_id"}
+        message = {
+            "receive_id": target_id,
+            "msg_type": "text",
+            "content": json.dumps({"text": text}),
+        }
+
         resp = requests.post(
             url, params=params, json=message, headers=headers, timeout=10
         )
+        _debug(f"[FEISHU] Response: {resp.status_code}")
         if resp.status_code == 200:
-            return True, resp.text
+            return (True, resp.text)
         else:
-            return False, f"Status {resp.status_code}: {resp.text}"
+            return (False, f"Status {resp.status_code}: {resp.text}")
     except Exception as e:
-        return False, str(e)
+        import traceback
+        _debug(f"[FEISHU] Exception: {e}")
+        traceback.print_exc()
+        return (False, str(e))
 
 
 def execute_command(cmd):
@@ -269,6 +310,10 @@ def get_help_text():
 • /交易模式 - 切换到交易模式
 • /查询模式 - 切换到仅查询模式
 
+**分析类:**
+• /多周期分析 - 执行多周期共振分析（默认DOGEUSDT）
+• /多周期分析 BTCUSDT - 指定品种
+
 **帮助:**
 • /help - 显示此帮助"""
 
@@ -297,6 +342,106 @@ def trigger_refresh():
 
     threading.Thread(target=do_refresh, daemon=True).start()
     return "🔄 监控刷新中，请稍候..."
+
+
+def run_multi_timeframe_analysis(symbol: str = "DOGE-USDT") -> str:
+    """运行多周期共振分析"""
+    try:
+        sys.path.insert(0, PROJECT_ROOT)
+        from quant_core.sources import create_datasource
+        
+        _debug(f"[MTF] Starting analysis for {symbol}")
+        
+        okx = create_datasource("okx")
+        
+        timeframes = [
+            ("1h", "1H", 50),
+            ("4h", "4H", 50),
+            ("1D", "1D", 30),
+            ("1W", "1W", 20),
+        ]
+        
+        results = []
+        for tf_name, tf_bar, tf_num in timeframes:
+            try:
+                _debug(f"[MTF] Fetching {tf_name}...")
+                bars = okx.get_history(symbol, bar_size=tf_bar, num=tf_num)
+                
+                if not bars:
+                    results.append(f"  {tf_name}: 无数据")
+                    continue
+                
+                closes = [b.close for b in bars]
+                current_price = closes[-1]
+                
+                rsi = calculate_rsi(closes)
+                ma20 = calculate_ma(closes, 20) if len(closes) >= 20 else None
+                ma50 = calculate_ma(closes, 50) if len(closes) >= 50 else None
+                
+                if ma20 and current_price > ma20:
+                    ma_signal = "BUY"
+                elif ma20 and current_price < ma20:
+                    ma_signal = "SELL"
+                else:
+                    ma_signal = "NEUTRAL"
+                
+                if rsi < 30:
+                    osc_signal = "BUY"
+                elif rsi > 70:
+                    osc_signal = "SELL"
+                else:
+                    osc_signal = "NEUTRAL"
+                
+                results.append(f"  {tf_name}: RSI={rsi:.1f} MA={ma_signal} OSC={osc_signal}")
+            except Exception as e:
+                _debug(f"[MTF] Error {tf_name}: {e}")
+                results.append(f"  {tf_name}: 获取失败 - {str(e)[:30]}")
+        
+        if not results:
+            return f"无法获取 {symbol} 的数据，请检查品种代码"
+        
+        buy_count = sum(1 for r in results if "BUY" in r)
+        sell_count = sum(1 for r in results if "SELL" in r)
+        total = len(timeframes)
+        resonance = int((max(buy_count, sell_count) / total) * 100) if total > 0 else 0
+        
+        level = "强共振" if buy_count > sell_count and buy_count >= 3 else "强分歧" if sell_count > buy_count and sell_count >= 3 else "分歧"
+        
+        return f"""**{symbol} 多周期共振分析**
+
+{chr(10).join(results)}
+
+**共振评分:** {resonance}/100 ({level})"""
+    except Exception as e:
+        _debug(f"[MTF] Final error: {e}")
+        return f"分析失败: {str(e)}"
+
+
+def calculate_rsi(prices: list, period: int = 14) -> float:
+    """计算 RSI"""
+    if len(prices) < period + 1:
+        return 50.0
+    
+    deltas = [prices[i] - prices[i-1] for i in range(1, len(prices))]
+    gains = [d if d > 0 else 0 for d in deltas]
+    losses = [-d if d < 0 else 0 for d in deltas]
+    
+    avg_gain = sum(gains[-period:]) / period
+    avg_loss = sum(losses[-period:]) / period
+    
+    if avg_loss == 0:
+        return 100.0
+    
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+
+def calculate_ma(prices: list, period: int) -> float:
+    """计算移动平均"""
+    if len(prices) < period:
+        return 0.0
+    return sum(prices[-period:]) / period
 
 
 COMMANDS = {
@@ -331,6 +476,8 @@ COMMANDS = {
         f"{get_python_cmd()} {Path(PROJECT_ROOT) / 'account' / 'get_trades.py'}"
     ),
     "help": lambda: get_help_text(),
+    # 多周期分析
+    "多周期分析": lambda: run_multi_timeframe_analysis(),
 }
 
 
@@ -412,6 +559,7 @@ def feishu_webhook():
         return jsonify({"challenge": challenge})
 
     try:
+        order_result = None  # 捕获订单结果用于 HTTP 响应
         event = request.json
         logger.info(f"[FEISHU] Event: {json.dumps(event, ensure_ascii=False)}")
 
@@ -442,7 +590,7 @@ def feishu_webhook():
                 if cache_key in feishu_webhook._msg_cache:
                     if current_time - feishu_webhook._msg_cache[cache_key] < 5:
                         logger.info(f"[FEISHU] Duplicate message: {msg_id}, skip")
-                        return jsonify({"status": "ok"}), 200
+                        return jsonify({"status": "ok", "order": order_result}), 200
                 feishu_webhook._msg_cache[cache_key] = current_time
             
             logger.info(f"[FEISHU] Message: {json.dumps(message, ensure_ascii=False)}")
@@ -466,18 +614,32 @@ def feishu_webhook():
             # 检查是否以 / 开头（命令模式）
             if text.startswith("/"):
                 cmd_name = text[1:].strip()
-                cmd_name_lower = cmd_name.lower()
+                _debug(f"[FEISHU] CMD: {cmd_name}")
                 logger.info(f"[FEISHU] Command: {cmd_name}")
+
+                # 分离命令和参数
+                parts = cmd_name.split(None, 1)
+                cmd_base = parts[0]
+                cmd_args = parts[1] if len(parts) > 1 else ""
 
                 # 尝试找到匹配的命令（忽略大小写）
                 matched_cmd = None
                 for cmd in COMMANDS:
-                    if cmd.lower() == cmd_name_lower:
+                    if cmd.lower() == cmd_base.lower():
                         matched_cmd = cmd
                         break
 
                 if matched_cmd:
-                    output = COMMANDS[matched_cmd]()
+                    logger.info(f"[FEISHU] matched_cmd={matched_cmd}")
+                    # 支持带参数的命令
+                    if matched_cmd == "多周期分析" and cmd_args:
+                        logger.info(f"[FEISHU] 调用多周期分析 with args: {cmd_args}")
+                        output = run_multi_timeframe_analysis(cmd_args.strip().upper())
+                    elif matched_cmd == "多周期分析":
+                        logger.info(f"[FEISHU] 调用多周期分析 default")
+                        output = run_multi_timeframe_analysis()
+                    else:
+                        output = COMMANDS[matched_cmd]()
                     logger.info(f"[FEISHU] Command output: {output}")
                     success, resp = send_feishu(f"**{cmd_name}**\n\n{output}", chat_id)
                     logger.info(f"[FEISHU] Send result: {success}")
@@ -505,53 +667,66 @@ def feishu_webhook():
                     parsed = parse_trading_command(text)
                     action = parsed.get('action')
                     symbol = parsed.get('symbol')
-                    quantity = parsed.get('quantity')
+                    quantity = parsed.get('quantity', 1)
+                    
+                    if quantity is None:
+                        quantity = 1
                     
                     if action and action != 'UNKNOWN':
                         try:
                             logger.info(f"[FEISHU] NL parsed: action={action}, symbol={symbol}, qty={quantity}")
+                            
+                            # 复用 IB 连接，直接调用 place_order_func.place_order
+                            # 添加事件循环，避免 ib_insync 内部错误
                             import asyncio
-                            from ib_insync import MarketOrder
-                            loop = asyncio.new_event_loop()
-                            asyncio.set_event_loop(loop)
+                            import sys
+                            import traceback as tb_module
+                            
+                            # 应用 nest_asyncio 允许嵌套事件循环（修复 ib_insync 在子线程中的问题）
+                            try:
+                                import nest_asyncio
+                                nest_asyncio.apply()
+                            except ImportError:
+                                pass
+                            
+                            from client.ib_connection import get_ib_connection
+                            from orders.place_order_func import place_order
+                            from orders.exchange_mapper import get_exchange_for_symbol
+                            
+                            _debug(f"[FEISHU] get_ib_connection() calling...", )
                             ib = get_ib_connection()
-                            if action == "CLOSE":
-                                positions = ib.positions()
-                                pos = None
-                                for p in positions:
-                                    if p.contract.symbol == symbol:
-                                        pos = p
-                                        break
-                                if pos and pos.position > 0:
-                                    order = MarketOrder(action="SELL", totalQuantity=abs(pos.position))
-                                    trade = ib.placeOrder(pos.contract, order)
-                                    ib.sleep(2)
-                                    result = {"symbol": symbol, "action": "SELL", "quantity": abs(pos.position), "status": trade.orderStatus.status}
-                                    send_feishu(f"✅ 平仓 {symbol} {abs(pos.position)} 手\n\n{result}", chat_id)
-                                else:
-                                    for o in ib.openOrders():
-                                        if o.contract.symbol == symbol:
-                                            ib.cancelOrder(o.order)
-                                    send_feishu(f"ℹ️ {symbol} 无持仓，已取消挂单", chat_id)
+                            _debug(f"[FEISHU] get_ib_connection() returned ib={ib}, connected={ib.isConnected() if ib else None}", )
+                            
+                            if ib is None or not ib.isConnected():
+                                error_msg = "IB 连接失败或已断开"
+                                _debug(f"[FEISHU] {error_msg}", )
+                                send_feishu(f"❌ 下单失败: {error_msg}\n请检查 IB Gateway", chat_id)
                             else:
-                                from orders.place_order_func import place_order
-                                from orders.exchange_mapper import get_exchange_for_symbol
-                                
-                                # 使用 ExchangeMapper 自动获取正确的交易所
                                 exchange = get_exchange_for_symbol(symbol, "FUT")
+                                is_close = (action == "CLOSE")
                                 
-                                result = place_order(ib, symbol, action, quantity, exchange=exchange)
-                                send_feishu(f"{action} {quantity} 手 {symbol} ({exchange}): {result}", chat_id)
-                            loop.close()
+                                _debug(f"[FEISHU] Calling place_order: symbol={symbol}, action={action}, qty={quantity}, exchange={exchange}, close_position={is_close}")
+                                
+                                # 直接调用 place_order（同步路径，避免协程问题）
+                                try:
+                                    result = place_order(ib, symbol, action, quantity, exchange=exchange, close_position=is_close)
+                                    if asyncio.iscoroutine(result):
+                                        result = asyncio.run(result)
+                                    _debug(f"[FEISHU] place_order returned: type={type(result)}, value={result}")
+                                    order_result = result  # 捕获用于 HTTP 响应
+                                    fs_result = send_feishu(f"[DEBUG] place_order result: {result}", chat_id)
+                                except Exception as e:
+                                    err_str = tb_module.format_exc()
+                                    _debug(f"[FEISHU] place_order EXCEPTION: {type(e).__name__}: {e}\n{err_str}")
+                                    order_result = {"error": f"{type(e).__name__}: {e}"}
                         except Exception as e:
-                            import traceback
-                            err = traceback.format_exc()
-                            logger.info(f"[FEISHU] Trade error: {e}\n{err}")
-                            send_feishu(f"❌ 下单失败: {e}", chat_id)
+                            err_str = tb_module.format_exc()
+                            _debug(f"[FEISHU] IB/connect EXCEPTION: {type(e).__name__}: {e}\n{err_str}", )
+                            order_result = {"error": f"{type(e).__name__}: {e}"}
                     else:
                         send_feishu(get_help_text(), chat_id)
 
-        return jsonify({"status": "ok"}), 200
+        return jsonify({"status": "ok", "order": order_result}), 200
     except Exception as e:
         logger.info(f"[FEISHU] Error: {e}")
         import traceback
@@ -577,35 +752,53 @@ def health():
     return jsonify({"status": "ok", "config": config_status})
 
 
-@app.route("/positions", methods=["GET"])
-def get_positions_api():
+@app.route("/test-mtf", methods=["POST"])
+def test_mtf():
     try:
-        import asyncio
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        ib = get_ib_connection()
-        positions = ib.positions()
-        result = []
-        for pos in positions:
-            result.append({
-                "symbol": pos.contract.symbol,
-                "position": pos.position,
-                "avgCost": pos.avgCost,
-            })
-        loop.close()
-        return jsonify({"status": "ok", "positions": result})
+        text = request.json.get("text", "/多周期分析")
+        if text.startswith("/多周期分析"):
+            cmd = text[1:].strip()
+            if cmd == "多周期分析":
+                symbol = "DOGE-USDT"
+            else:
+                symbol = cmd.strip().upper()
+            result = run_multi_timeframe_analysis(symbol)
+            return jsonify({"status": "ok", "result": result})
+        return jsonify({"status": "error", "message": "invalid command"})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 if __name__ == "__main__":
+    # Fix Windows GBK encoding for emoji
+    import sys
+    if sys.platform == 'win32':
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    
     port = int(sys.argv[1]) if len(sys.argv) > 1 else get_webhook_port()
 
     print("=" * 60)
-    print("🚀 TradingView -> 飞书 中转服务启动")
+    print("[START] TradingView -> Feishu Bridge")
     print("=" * 60)
-    print(f"📍 服务地址: http://0.0.0.0:{port}")
-    print(f"🔒 模式: {'仅查询' if QUERY_ONLY else '交易'}")
+    print(f"Address: http://0.0.0.0:{port}")
+
+    # 启动时预初始化 IB（后台线程，避免阻塞 Flask）
+    import threading
+    def _bg_connect():
+        try:
+            ib = get_ib_connection()
+            print(f"[IB] pre-connect result: connected={ib.isConnected() if ib else False}")
+        except Exception as e:
+            print(f"[IB] pre-connect failed: {e}")
+    t = threading.Thread(target=_bg_connect, daemon=True)
+    t.start()
+    # 不等待，让 Flask 立即启动，IB 在后台连接
+    print("[IB] 连接已在后台启动...")
+
+    print()
+    print(f"Mode: {'Query Only' if QUERY_ONLY else 'Trading'}")
 
     # 自动检查并启动 Z120 监控
     z120_running = get_z120_status()
@@ -632,4 +825,4 @@ if __name__ == "__main__":
     print("  /help - 显示帮助")
     print("=" * 60)
 
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, threaded=True)

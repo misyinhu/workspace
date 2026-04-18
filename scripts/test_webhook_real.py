@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Webhook 交易测试 - 真实 IB 连接测试
 仅在 CXClaw 上运行，需要 IB Gateway
@@ -8,6 +9,11 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import json
+
+# Fix Windows console encoding
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 
 def test_nl_parser():
