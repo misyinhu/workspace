@@ -1079,6 +1079,8 @@ if __name__ == "__main__":
         try:
             ib = get_ib_connection()
             print(f"[IB] pre-connect result: connected={ib.isConnected() if ib else False}")
+            # 注册 execDetails 成交回调
+            _register_fill_callback()
         except Exception as e:
             print(f"[IB] pre-connect failed: {e}")
     t = threading.Thread(target=_bg_connect, daemon=True)
