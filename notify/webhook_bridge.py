@@ -431,8 +431,8 @@ def get_positions_formatted():
         ib = _get_ib()
         if ib is None:
             return "❌ IB 未连接"
-        # positions 是缓存数据，可以直接读取
-        positions = ib.positions()
+        # positions 需要通过 run_sync 在 IB 线程执行
+        positions = _run_ib(lambda: ib.positions(), timeout=15)
         if not positions:
             return "📊 当前无持仓"
         lines = ["**📊 当前持仓**\n"]
