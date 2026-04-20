@@ -13,7 +13,7 @@ _project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from ib_insync import IB, Stock, Future, Forex, CFD, Contract, Order, MarketOrder, LimitOrder, StopOrder, StopLimitOrder
+from ib_insync import IB, Stock, Future, Forex, CFD, Crypto, Contract, Order, MarketOrder, LimitOrder, StopOrder, StopLimitOrder
 from orders.exchange_mapper import get_exchange_for_symbol
 from client.ib_connection import get_ib_manager
 
@@ -205,9 +205,19 @@ def _place_order_impl(
             # 确保合约有 conId，否则用 localSymbol 或 symbol 构建
             con_id = getattr(pos_contract, "conId", None)
             local_sym = getattr(pos_contract, "localSymbol", None)
+            pos_sec_type = getattr(pos_contract, "secType", None)
+            pos_currency = getattr(pos_contract, "currency", currency)
             pos_exchange = getattr(pos_contract, "exchange", exchange) or exchange
             
-            if con_id and con_id > 0:
+            # secType 特定的默认 exchange
+            if not pos_exchange or pos_exchange.strip() == "":
+                _default_exchanges = {"CRYPTO": "PAXOS", "CFD": "SMART", "CMDTY": "SMART", "STK": "SMART"}
+                pos_exchange = _default_exchanges.get(pos_sec_type, exchange or "SMART")
+            
+            # CRYPTO 用 Crypto 类构建（确保 exchange 正确）
+            if pos_sec_type == "CRYPTO":
+                pos_contract = Crypto(symbol, exchange=pos_exchange, currency=pos_currency or "USD")
+            elif con_id and con_id > 0:
                 # 使用 conId 构建合约（最可靠）
                 pos_contract = Contract(conId=con_id, exchange=pos_exchange)
             elif local_sym:
