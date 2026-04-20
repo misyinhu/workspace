@@ -3,24 +3,55 @@
 
 import os
 import sys
+from pathlib import Path
 from typing import Optional
 
+import yaml
 from okx import Account, Trade, MarketData
 
 
+def _load_config():
+    for p in [Path(__file__).parent / "config.yaml", Path(__file__).parent.parent / "config" / "okx.yaml"]:
+        if p.exists():
+            with open(p) as f:
+                return yaml.safe_load(f)
+    return {}
+
+
 class OKXTrader:
-    def __init__(self, flag: str = "0"):
-        self.api_key = os.getenv("OKX_API_KEY")
-        self.secret = os.getenv("OKX_API_SECRET")
-        self.passphrase = os.getenv("OKX_PASSPHRASE")
+    def __init__(self, flag: str = "2"):
         self.flag = flag
 
+        env_key = os.getenv("OKX_API_KEY")
+        if env_key:
+            self.api_key = env_key
+            self.secret = os.getenv("OKX_API_SECRET", "")
+            self.passphrase = os.getenv("OKX_PASSPHRASE", "")
+        else:
+            config = _load_config()
+            okx_config = config.get("okx", {})
+            mode_map = {"1": "live", "2": "sim"}
+            mode = mode_map.get(flag, "sim")
+            creds_list = okx_config.get(mode, [])
+            if creds_list:
+                creds = creds_list[0] if isinstance(creds_list, list) else creds_list
+                self.api_key = creds.get("apikey", "")
+                self.secret = creds.get("secretkey", "")
+                self.passphrase = creds.get("passphrase", "")
+            else:
+                self.api_key = ""
+                self.secret = ""
+                self.passphrase = ""
+
         if not all([self.api_key, self.secret, self.passphrase]):
-            raise ValueError("请设置环境变量: OKX_API_KEY, OKX_API_SECRET, OKX_PASSPHRASE")
+            raise ValueError(f"OKX 密钥未配置 (flag={flag})")
 
         self.account = Account.AccountAPI(self.api_key, self.secret, self.passphrase, self.flag)
         self.trade = Trade.TradeAPI(self.api_key, self.secret, self.passphrase, self.flag)
         self.market = MarketData.MarketAPI()
+
+    def set_leverage(self, inst_id: str, leverage: str, tdMode: str = "cross"):
+        self.account.set_leverage(instId=inst_id, lever=leverage, mgnMode=tdMode)
 
     def get_balance(self):
         return self.account.get_account_balance()
@@ -79,14 +110,36 @@ class OKXTrader:
         
         return sum(tr_values) / len(tr_values)
 
-    def place_order(self, inst_id: str, side: str, sz: str, ord_type: str = "market"):
-        return self.trade.place_order(
-            instId=inst_id,
-            tdMode="cash",
-            side=side,
-            ordType=ord_type,
-            sz=sz
-        )
+    def place_order(
+        self,
+        inst_id: str,
+        side: str,
+        sz: str,
+        ord_type: str = "market",
+        tdMode: str = "cash",
+        leverage: str = None,
+    ):
+        params = {
+            "instId": inst_id,
+            "tdMode": tdMode,
+            "side": side,
+            "ordType": ord_type,
+            "sz": sz,
+        }
+        if leverage:
+            params["leverage"] = leverage
+        return self.trade.place_order(**params)
+
+    def calc_quantity_from_usd(self, inst_id: str, usd_amount: float, leverage: int = 1) -> int:
+        ticker = self.get_ticker(inst_id)
+        if ticker.get("code") != "0" or not ticker.get("data"):
+            raise ValueError(f"获取 {inst_id} 价格失败: {ticker}")
+        last_price = float(ticker["data"][0]["last"])
+        position_value = usd_amount * leverage
+        quantity = int(position_value / last_price)
+        if quantity < 1:
+            quantity = 1
+        return quantity
 
     def cancel_order(self, inst_id: str, ord_id: str):
         return self.trade.cancel_order(instId=inst_id, ordId=ord_id)

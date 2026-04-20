@@ -2,10 +2,10 @@
 # 密钥从环境变量读取，不要直接写在文件中
 
 okx:
-  # 交易模式: 0=实盘, 1=模拟盘
-  flag: "1"
+  # 交易模式: 1=实盘, 2=模拟盘
+  flag: "2"
   
-  opencode:
+  live:
     - apikey : "f74131b4-a111-4ee4-8e9d-e5e52d7f395f"
     - secretkey : "BD9FDEDF622C605F94AAB91FE8846B7F"
     - passphrase : "AbcD@1234“

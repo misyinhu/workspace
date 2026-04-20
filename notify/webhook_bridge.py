@@ -752,76 +752,134 @@ COMMANDS = {
 }
 
 
+def _submit_okx_order(symbol: str, action: str, quantity: int, usd_amount: float = None, 
+                       leverage: int = None, margin_mode: str = "cross", order_type: str = "market"):
+    okx_trader = None
+    try:
+        from okx_client.okx_trader import OKXTrader
+        okx_trader = OKXTrader()
+    except Exception as e:
+        return {"error": f"OKX 客户端初始化失败: {e}"}
+    
+    try:
+        if usd_amount and leverage:
+            quantity = okx_trader.calc_quantity_from_usd(symbol, usd_amount, leverage)
+            okx_trader.set_leverage(symbol, str(leverage), margin_mode)
+        
+        side = "buy" if action == "BUY" else "sell"
+        td_mode = "cross" if margin_mode == "cross" else "isolated"
+        result = okx_trader.place_order(
+            inst_id=symbol,
+            side=side,
+            sz=str(quantity),
+            ord_type=order_type.lower(),
+            tdMode=td_mode,
+            leverage=str(leverage) if leverage else None,
+        )
+        return result
+    except Exception as e:
+        return {"error": f"OKX 下单失败: {e}"}
+
+
 @app.route("/tv-webhook", methods=["POST"])
 def tv_webhook():
-    """接收Webhook（任意来源，支持 TradingView 自动交易）"""
     try:
         data = request.json
         print(f"收到Webhook数据:")
         print(json.dumps(data, indent=2, ensure_ascii=False))
 
-        # 检查是否是交易信号（包含 symbol, action）
         symbol = data.get("symbol", "").upper()
         action = data.get("action", "").upper()
 
         if symbol and action in ("BUY", "SELL", "CLOSE"):
-            # 自动交易模式
             quantity = data.get("quantity", 1)
             order_type = data.get("order_type", "MKT")
             sec_type = data.get("sec_type", "FUT")
-            exchange = data.get("exchange", "COMEX")
-            use_main_contract = data.get("use_main_contract", True)
-            limit_price = data.get("limit_price")
+            exchange = data.get("exchange", "").upper()
+            usd_amount = data.get("usd_amount")
+            leverage = data.get("leverage")
+            margin_mode = data.get("margin_mode", "cross")
 
-            # 复用 IB 连接直接下单，避免 subprocess 创建新连接导致 clientId 冲突
-            try:
-                from orders.exchange_mapper import get_exchange_for_symbol
-                exchange = get_exchange_for_symbol(symbol, "FUT") if sec_type == "FUT" else ""
-            except Exception:
-                exchange = ""
-            
-            try:
-                from client.ib_connection import get_ib_connection
-                from orders.place_order_func import place_order
+            if exchange == "OKX":
+                from datetime import datetime
+                time_str = datetime.now().strftime("%H:%M:%S")
+                action_cn = "买入" if action == "BUY" else "卖出"
+                leverage_info = f" {leverage}x杠杆" if leverage else ""
+                submit_msg = f"""⏳ **OKX 订单提交中**
+━━━━━━━━━━━━━━━━
+标的: {symbol}
+方向: {action_cn}{leverage_info}
+模式: {margin_mode}
+时间: {time_str}"""
+                send_feishu(submit_msg)
+                
+                result = _submit_okx_order(
+                    symbol=symbol,
+                    action=action,
+                    quantity=quantity,
+                    usd_amount=usd_amount,
+                    leverage=leverage,
+                    margin_mode=margin_mode,
+                    order_type=order_type,
+                )
+                
+                output_str = str(result)[:500] if result else ""
+                msg = f"""🤖 **OKX 交易信号**
+━━━━━━━━━━━━━━━━
+标的: {symbol}
+操作: {action}
+杠杆: {leverage}x
+保证金: {usd_amount} USD
+数量: {quantity}
 
-                ib = get_ib_connection()
-                if ib is None or not ib.isConnected():
-                    output = "IB 连接失败或已断开"
-                else:
-                    # 期货默认启用 outside_rth，支持盘前/盘后交易
-                    # 先发送订单提交通知（立即）
-                    from datetime import datetime
-                    time_str = datetime.now().strftime("%H:%M:%S")
-                    action_cn = "买入" if action == "BUY" else "卖出" if action == "SELL" else "平仓"
-                    submit_msg = f"""⏳ **订单提交中**
-━━━━━━━━━━━━━━━
+结果:
+{output_str}"""
+                send_feishu(msg)
+                return jsonify({"status": "ok", "order": result})
+            else:
+                try:
+                    from orders.exchange_mapper import get_exchange_for_symbol
+                    exchange = get_exchange_for_symbol(symbol, "FUT") if sec_type == "FUT" else ""
+                except Exception:
+                    exchange = ""
+                
+                try:
+                    from client.ib_connection import get_ib_connection
+                    from orders.place_order_func import place_order
+
+                    ib = get_ib_connection()
+                    if ib is None or not ib.isConnected():
+                        output = "IB 连接失败或已断开"
+                    else:
+                        from datetime import datetime
+                        time_str = datetime.now().strftime("%H:%M:%S")
+                        action_cn = "买入" if action == "BUY" else "卖出" if action == "SELL" else "平仓"
+                        submit_msg = f"""⏳ **订单提交中**
+━━━━━━━━━━━━━━━━
 标的: {symbol} ({exchange})
 方向: {action_cn}
 数量: {quantity} 手
 时间: {time_str}"""
-                    _ = send_feishu(submit_msg)
-                    
-                    # 后台提交订单
-                    future = _submit_order_in_background(
-                        ib, symbol, action, quantity,
-                        exchange=exchange,
-                        sec_type=sec_type,
-                        close_position=(action == "CLOSE"),
-                        outside_rth=True
-                    )
-                    output = {"status": "Submitted", "message": f"后台已提交下单: {symbol} {action} {quantity}"}
-            except Exception as e:
-                output = f"错误: {e}"
+                        _ = send_feishu(submit_msg)
+                        
+                        future = _submit_order_in_background(
+                            ib, symbol, action, quantity,
+                            exchange=exchange,
+                            sec_type=sec_type,
+                            close_position=(action == "CLOSE"),
+                            outside_rth=True
+                        )
+                        output = {"status": "Submitted", "message": f"后台已提交下单: {symbol} {action} {quantity}"}
+                except Exception as e:
+                    output = f"错误: {e}"
 
-            # 发送交易结果到飞书
-            output_str = str(output)[:500] if output else ""
-            msg = f"🤖 Webhook 交易信号\n\n标的: {symbol}\n操作: {action}\n数量: {quantity}\n订单类型: {order_type}\n\n结果:\n{output_str}"
-            send_feishu(msg)
+                output_str = str(output)[:500] if output else ""
+                msg = f"🤖 Webhook 交易信号\n\n标的: {symbol}\n操作: {action}\n数量: {quantity}\n订单类型: {order_type}\n\n结果:\n{output_str}"
+                send_feishu(msg)
 
-            order_payload = output if isinstance(output, dict) else {"status": "Unknown", "order": str(output)}
-            return jsonify({"status": "ok", "order": order_payload})
+                order_payload = output if isinstance(output, dict) else {"status": "Unknown", "order": str(output)}
+                return jsonify({"status": "ok", "order": order_payload})
         else:
-            # 仅通知模式
             title = data.get("title", "Webhook 警报")
             description = data.get("description", "")
             success, result = send_feishu(f"{title}\n\n{description}")
