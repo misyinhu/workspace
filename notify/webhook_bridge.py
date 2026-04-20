@@ -84,10 +84,21 @@ def _on_exec_details(trade, fill):
         # 翻译方向
         action_cn = "买入" if side == "BOT" else "卖出" if side == "SLD" else side
         
-        # 格式化时间 (UTC+8)
-        from datetime import timedelta
-        local_time = exec_time + timedelta(hours=8) if exec_time else None
-        time_str = local_time.strftime("%H:%M:%S") if local_time else "--:--:--"
+        # 格式化时间 (直接用北京时间显示)
+        # IB 的 exec_time 通常已经是 UTC，但有时需要特殊处理
+        from datetime import timezone, timedelta
+        beijing_tz = timezone(timedelta(hours=8))
+        
+        if exec_time:
+            # 打印原始时间调试
+            _debug(f"[FILL] raw exec_time={exec_time}, repr={repr(exec_time)}")
+            
+            # 直接用当前北京时间（因为 exec_time 可能不准确）
+            from datetime import datetime
+            local_time = datetime.now(beijing_tz)
+            time_str = local_time.strftime("%H:%M:%S")
+        else:
+            time_str = "--:--:--"
 
         # 统一格式：成交回报
         msg = f"""📈 **成交回报**
@@ -778,6 +789,19 @@ def tv_webhook():
                     output = "IB 连接失败或已断开"
                 else:
                     # 期货默认启用 outside_rth，支持盘前/盘后交易
+                    # 先发送订单提交通知（立即）
+                    from datetime import datetime
+                    time_str = datetime.now().strftime("%H:%M:%S")
+                    action_cn = "买入" if action == "BUY" else "卖出" if action == "SELL" else "平仓"
+                    submit_msg = f"""⏳ **订单提交中**
+━━━━━━━━━━━━━━━
+标的: {symbol} ({exchange})
+方向: {action_cn}
+数量: {quantity} 手
+时间: {time_str}"""
+                    _ = send_feishu(submit_msg)
+                    
+                    # 后台提交订单
                     future = _submit_order_in_background(
                         ib, symbol, action, quantity,
                         exchange=exchange,
@@ -785,44 +809,7 @@ def tv_webhook():
                         close_position=(action == "CLOSE"),
                         outside_rth=True
                     )
-                    # 等待订单结果（最多 3 秒）获取 orderId 等信息
-                    try:
-                        result = future.result(timeout=3.0)
-                        order_id = result.get("orderId", 0) if isinstance(result, dict) else 0
-                        status = result.get("status", "Submitted") if isinstance(result, dict) else "Submitted"
-                        error = result.get("error") if isinstance(result, dict) else None
-                    except Exception:
-                        result = {}
-                        order_id = 0
-                        status = "Submitted"
-                        error = None
-                    
-                    # 翻译方向
-                    action_cn = "买入" if action == "BUY" else "卖出" if action == "SELL" else "平仓"
-                    
-                    # 统一格式：订单提交
-                    from datetime import datetime
-                    time_str = datetime.now().strftime("%H:%M:%S")
-                    if error:
-                        msg = f"""❌ **订单失败**
-━━━━━━━━━━━━━━━
-标的: {symbol} ({exchange})
-方向: {action_cn}
-数量: {quantity} 手
-时间: {time_str}
-错误: {error}"""
-                    else:
-                        msg = f"""⏳ **订单已提交**
-━━━━━━━━━━━━━━━
-标的: {symbol} ({exchange})
-方向: {action_cn}
-数量: {quantity} 手
-时间: {time_str}
-订单ID: {order_id}
-状态: {status}"""
-                    
-                    _ = send_feishu(msg)
-                    output = result if isinstance(result, dict) else {"status": status, "orderId": order_id}
+                    output = {"status": "Submitted", "message": f"后台已提交下单: {symbol} {action} {quantity}"}
             except Exception as e:
                 output = f"错误: {e}"
 
@@ -1020,47 +1007,21 @@ def feishu_webhook():
                                 
                                 _debug(f"[FEISHU] Calling place_order: symbol={actual_symbol}, action={action}, qty={quantity}, sec_type={sec_type}, exchange={exchange}, conId={actual_conId}, close_position={is_close}")
                                 
-                                # 使用后台提交，避免阻塞
-                                future = _submit_order_in_background(ib, actual_symbol, action, quantity, exchange=exchange, sec_type=sec_type, conId=actual_conId, close_position=is_close)
-                                
-                                # 等待订单结果（最多 3 秒）获取 orderId 等信息
-                                try:
-                                    result = future.result(timeout=3.0)
-                                    order_id = result.get("orderId", 0) if isinstance(result, dict) else 0
-                                    status = result.get("status", "Submitted") if isinstance(result, dict) else "Submitted"
-                                    error = result.get("error") if isinstance(result, dict) else None
-                                except Exception:
-                                    result = {}
-                                    order_id = 0
-                                    status = "Submitted"
-                                    error = None
-                                
-                                # 翻译方向
-                                action_cn = "买入" if action == "BUY" else "卖出" if action == "SELL" else "平仓"
-                                
-                                # 统一格式：订单提交
+                                # 先发送订单提交通知（立即）
                                 from datetime import datetime
                                 time_str = datetime.now().strftime("%H:%M:%S")
-                                if error:
-                                    msg = f"""❌ **订单失败**
+                                action_cn = "买入" if action == "BUY" else "卖出" if action == "SELL" else "平仓"
+                                submit_msg = f"""⏳ **订单提交中**
 ━━━━━━━━━━━━━━━
 标的: {symbol} ({exchange})
 方向: {action_cn}
 数量: {quantity} 手
-时间: {time_str}
-错误: {error}"""
-                                else:
-                                    msg = f"""⏳ **订单已提交**
-━━━━━━━━━━━━━━━
-标的: {symbol} ({exchange})
-方向: {action_cn}
-数量: {quantity} 手
-时间: {time_str}
-订单ID: {order_id}
-状态: {status}"""
+时间: {time_str}"""
+                                send_feishu(submit_msg, chat_id)
                                 
-                                fs_result = send_feishu(msg, chat_id)
-                                order_result = result if isinstance(result, dict) else {"status": status, "orderId": order_id}
+                                # 后台提交订单
+                                future = _submit_order_in_background(ib, actual_symbol, action, quantity, exchange=exchange, sec_type=sec_type, conId=actual_conId, close_position=is_close)
+                                order_result = {"status": "Submitted", "symbol": symbol, "action": action, "quantity": quantity, "exchange": exchange}
                         except Exception as e:
                             err_str = tb_module.format_exc()
                             _debug(f"[FEISHU] IB/connect EXCEPTION: {type(e).__name__}: {e}\n{err_str}", )
