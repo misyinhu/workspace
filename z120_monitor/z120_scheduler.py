@@ -564,8 +564,9 @@ class Z120ScheduledMonitor:
             if current_spread is None:
                 print(f"  ❌ 无法获取当前价差")
                 logging.warning(f"{pair_name}: 无法获取当前价差")
-                send_feishu_alert(f"⚠️ Z120监控: {pair_name} 无法获取当前价差")
                 continue
+                send_feishu_alert(f"⚠️ Z120监控: {pair_name} 无法获取当前价差")
+                #continue
 
             pair_threshold = pair_config.get("threshold", 0)
             oversold = pair_config.get("oversold", 0.0)

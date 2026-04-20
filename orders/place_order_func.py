@@ -216,7 +216,7 @@ def _place_order_impl(
             if pos_contract.secType == "STK" and pos_contract.exchange in ("ARCA", "NYSE", "NASDAQ"):
                 pos_contract = Stock(symbol, exchange="SMART", currency=getattr(pos_contract, "currency", currency))
 
-            close_order = MarketOrder(action=pos_action, totalQuantity=int(pos_qty))
+            close_order = MarketOrder(action=pos_action, totalQuantity=float(pos_qty))
             close_order.tif = tif
             close_order.outsideRth = outside_rth
 
@@ -236,7 +236,7 @@ def _place_order_impl(
 
             all_results.append({
                 "contract": getattr(pos_contract, "localSymbol", symbol),
-                "action": pos_action, "quantity": int(pos_qty),
+                "action": pos_action, "quantity": float(pos_qty),
                 "status": order_status, "filled": filled_qty, "error": error_msg,
             })
 
@@ -340,6 +340,8 @@ def _place_order_impl(
             "status": order_status, "filled": 0,
             "error": error_msg or "Order cancelled or failed", "message": "Order failed",
         }
+    # No polling - fill notification handled by execDetails callback
+
     return {
         "orderId": order_id, "symbol": contract_symbol, "action": action,
         "quantity": quantity, "orderType": order_type,
