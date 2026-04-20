@@ -4,6 +4,18 @@
 import re
 from typing import Dict, Any
 
+# 外汇品种列表（真正的外汇对，使用 CASH 类型，交易所 IDEALPRO）
+FOREX_SYMBOLS = {
+    'EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'NZDUSD', 'USDCAD',
+    'EURJPY', 'GBPJPY', 'EURGBP', 'EURAUD', 'GBPAUD',
+}
+
+# 商品品种列表（贵金属等，使用 CMDTY 类型）
+CMDTY_SYMBOLS = {
+    'XAUUSD',  # 黄金 vs USD
+    'XAGUSD',  # 白银 vs USD
+}
+
 TRADING_PATTERNS = [
     # 平仓 patterns (优先匹配)
     (r"平掉(\S+?)(?:仓|位)$", "CLOSE"),
@@ -82,6 +94,14 @@ def parse_trading_command(message: str) -> Dict[str, Any]:
                         symbol = v
                         break
                 result["symbol"] = symbol
+                
+                # 检测品种类型
+                if symbol in CMDTY_SYMBOLS:
+                    result["sec_type"] = "CMDTY"
+                    result["exchange"] = "SMART"
+                elif symbol in FOREX_SYMBOLS:
+                    result["sec_type"] = "CASH"
+                    result["exchange"] = "IDEALPRO"
             
             return result
     

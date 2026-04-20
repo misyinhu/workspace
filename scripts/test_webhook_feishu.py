@@ -134,26 +134,36 @@ def test_trading_commands():
             order = data.get("order", {})
             
             # 打印订单结果
-            if order:
-                if "error" in order:
-                    print(f"   ❌ 订单错误: {order['error']}")
-                else:
-                    status = order.get("status", "unknown")
-                    order_id = order.get("orderId", "?")
-                    filled = order.get("filled", 0)
-                    avg_fill = order.get("avgFill", 0)
-                    remaining = order.get("remaining", 0)
-                    print(f"   📋 订单 #{order_id}: status={status}, filled={filled}, remaining={remaining}")
-                    if status in ("Filled", "PartFilled"):
-                        print(f"   ✅ 成交! avgFill={avg_fill}")
-                    elif status in ("Submitted", "PendingSubmit"):
-                        print(f"   ⏳ 等待成交...")
-                    elif status == "ApiPending":
-                        print(f"   ⏳ API待提交...")
-                    else:
-                        print(f"   ⚠️  未成交 (status={status})")
-            else:
+            if not ok:
+                print(f"   ❌ 请求失败: HTTP错误")
+                all_passed = False
+                continue
+            
+            if not order:
                 print(f"   ❌ 无响应")
+                all_passed = False
+                continue
+            
+            if "error" in str(order).lower():
+                print(f"   ❌ 订单错误: {order}")
+                all_passed = False
+                continue
+            
+            status = order.get("status", "unknown")
+            order_id = order.get("orderId", "?")
+            filled = order.get("filled", 0)
+            avg_fill = order.get("avgFill", 0)
+            remaining = order.get("remaining", 0)
+            print(f"   📋 订单 #{order_id}: status={status}, filled={filled}, remaining={remaining}")
+            
+            if status in ("Filled", "PartFilled"):
+                print(f"   ✅ 成交! avgFill={avg_fill}")
+            elif status in ("Submitted", "PendingSubmit"):
+                print(f"   ⏳ 等待成交...")
+            elif status == "ApiPending":
+                print(f"   ⏳ API待提交...")
+            else:
+                print(f"   ❌ 未成交 (status={status})")
                 all_passed = False
                 continue
             

@@ -49,3 +49,8 @@ instruments:
     name: "Micro Gold"
     exchange: "COMEX"
     source: "ib"
+    
+  - symbol: "MHG"
+    name: "Micro Gold Continuous"
+    exchange: "COMEX"
+    source: "ib"

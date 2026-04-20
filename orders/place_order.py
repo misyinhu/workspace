@@ -30,7 +30,6 @@ from ib_insync import (
     Order,
 )
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from client.ibkr_client import get_client_id, IBKR_HOST, IBKR_PORT
 
 

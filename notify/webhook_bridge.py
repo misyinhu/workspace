@@ -30,6 +30,29 @@ sys.path.insert(0, PROJECT_ROOT)
 from config import load_config, is_query_only, set_query_only, get_webhook_port, get_project_root
 from client.ib_connection import get_ib_connection
 from notify.nl_parser import parse_trading_command
+from concurrent.futures import ThreadPoolExecutor
+import threading
+import sys
+
+# Background executor for submitting orders without blocking HTTP request
+_order_executor = ThreadPoolExecutor(max_workers=4)
+
+def _submit_order_in_background(ib, symbol, action, quantity, exchange=None, sec_type=None, conId=None, close_position=False, outside_rth=None):
+    """在后台提交订单，避免阻塞主线程。
+    
+    对于期货（FUT）默认启用 outsideRth=True，允许盘前/盘后交易。
+    """
+    # 期货默认启用盘前交易
+    if outside_rth is None:
+        outside_rth = True  # 默认启用，支持期货盘前订单
+    def _order_job():
+        try:
+            from orders.place_order_func import place_order
+            return place_order(ib, symbol, action, quantity, exchange=exchange, sec_type=sec_type, conId=conId, close_position=close_position, outside_rth=outside_rth)
+        except Exception as e:
+            print(f"[FEISHU] Background order error: {e}", file=sys.stderr)
+            return {"error": str(e)}
+    return _order_executor.submit(_order_job)
 
 # 加载主配置
 load_config()
@@ -498,7 +521,7 @@ def tv_webhook():
         symbol = data.get("symbol", "").upper()
         action = data.get("action", "").upper()
 
-        if symbol and action in ("BUY", "SELL"):
+        if symbol and action in ("BUY", "SELL", "CLOSE"):
             # 自动交易模式
             quantity = data.get("quantity", 1)
             order_type = data.get("order_type", "MKT")
@@ -508,31 +531,41 @@ def tv_webhook():
             limit_price = data.get("limit_price")
 
             # 复用 IB 连接直接下单，避免 subprocess 创建新连接导致 clientId 冲突
-            exchange = get_exchange_for_symbol(symbol, "FUT") if sec_type == "FUT" else ""
+            try:
+                from orders.exchange_mapper import get_exchange_for_symbol
+                exchange = get_exchange_for_symbol(symbol, "FUT") if sec_type == "FUT" else ""
+            except Exception:
+                exchange = ""
             
             try:
                 from client.ib_connection import get_ib_connection
                 from orders.place_order_func import place_order
-                
+
                 ib = get_ib_connection()
                 if ib is None or not ib.isConnected():
                     output = "IB 连接失败或已断开"
                 else:
-                    try:
-                        result = place_order(ib, symbol, action, quantity, exchange=exchange, close_position=(action == "CLOSE"))
-                        if asyncio.iscoroutine(result):
-                            result = asyncio.run(result)
-                        output = str(result)
-                    except Exception as inner_e:
-                        output = f"下单错误: {inner_e}"
+                    # 期货默认启用 outside_rth，支持盘前/盘后交易
+                    future = _submit_order_in_background(
+                        ib, symbol, action, quantity,
+                        exchange=exchange,
+                        sec_type=sec_type,
+                        close_position=(action == "CLOSE"),
+                        outside_rth=True
+                    )
+                    output = {"status": "Submitted", "message": f"后台已提交下单: {symbol} {action} {quantity}"}
+                    # Feishu 提示提交状态 (不指定 chat_id，使用默认)
+                    _ = send_feishu(f"✅ 订单已提交: {symbol} {action} {quantity}")
             except Exception as e:
                 output = f"错误: {e}"
 
             # 发送交易结果到飞书
-            msg = f"🤖 Webhook 交易信号\n\n标的: {symbol}\n操作: {action}\n数量: {quantity}\n订单类型: {order_type}\n\n结果:\n{output[:500]}"
+            output_str = str(output)[:500] if output else ""
+            msg = f"🤖 Webhook 交易信号\n\n标的: {symbol}\n操作: {action}\n数量: {quantity}\n订单类型: {order_type}\n\n结果:\n{output_str}"
             send_feishu(msg)
 
-            return jsonify({"status": "ok", "order": output[:200]})
+            order_payload = output if isinstance(output, dict) else {"status": "Unknown", "order": str(output)}
+            return jsonify({"status": "ok", "order": order_payload})
         else:
             # 仅通知模式
             title = data.get("title", "Webhook 警报")
@@ -667,13 +700,17 @@ def feishu_webhook():
                     action = parsed.get('action')
                     symbol = parsed.get('symbol')
                     quantity = parsed.get('quantity', 1)
+                    sec_type = parsed.get('sec_type')  # 外汇为 CASH, 黄金为 CFD
+                    parsed_exchange = parsed.get('exchange')  # 交易所
+                    cfd_symbol = parsed.get('cfd_symbol')  # CFD 实际符号
+                    cfd_conId = parsed.get('cfd_conId')  # CFD 合约ID
                     
                     if quantity is None:
                         quantity = 1
                     
                     if action and action != 'UNKNOWN':
                         try:
-                            logger.info(f"[FEISHU] NL parsed: action={action}, symbol={symbol}, qty={quantity}")
+                            logger.info(f"[FEISHU] NL parsed: action={action}, symbol={symbol}, qty={quantity}, sec_type={sec_type}")
                             
                             # 复用 IB 连接，直接调用 place_order_func.place_order
                             # 添加事件循环，避免 ib_insync 内部错误
@@ -701,23 +738,25 @@ def feishu_webhook():
                                 _debug(f"[FEISHU] {error_msg}", )
                                 send_feishu(f"❌ 下单失败: {error_msg}\n请检查 IB Gateway", chat_id)
                             else:
-                                exchange = get_exchange_for_symbol(symbol, "FUT")
+                                # 使用解析出的交易所，或根据品种类型推断
+                                if parsed_exchange:
+                                    exchange = parsed_exchange
+                                elif sec_type:
+                                    exchange = get_exchange_for_symbol(symbol, sec_type)
+                                else:
+                                    exchange = get_exchange_for_symbol(symbol, "FUT")
                                 is_close = (action == "CLOSE")
                                 
-                                _debug(f"[FEISHU] Calling place_order: symbol={symbol}, action={action}, qty={quantity}, exchange={exchange}, close_position={is_close}")
+                                # CFD 使用实际符号
+                                actual_symbol = cfd_symbol if cfd_symbol else symbol
+                                actual_conId = cfd_conId if cfd_conId else None
                                 
-                                # 直接调用 place_order（同步路径，避免协程问题）
-                                try:
-                                    result = place_order(ib, symbol, action, quantity, exchange=exchange, close_position=is_close)
-                                    if asyncio.iscoroutine(result):
-                                        result = asyncio.run(result)
-                                    _debug(f"[FEISHU] place_order returned: type={type(result)}, value={result}")
-                                    order_result = result  # 捕获用于 HTTP 响应
-                                    fs_result = send_feishu(f"[DEBUG] place_order result: {result}", chat_id)
-                                except Exception as e:
-                                    err_str = tb_module.format_exc()
-                                    _debug(f"[FEISHU] place_order EXCEPTION: {type(e).__name__}: {e}\n{err_str}")
-                                    order_result = {"error": f"{type(e).__name__}: {e}"}
+                                _debug(f"[FEISHU] Calling place_order: symbol={actual_symbol}, action={action}, qty={quantity}, sec_type={sec_type}, exchange={exchange}, conId={actual_conId}, close_position={is_close}")
+                                
+                                # 使用后台提交，避免阻塞
+                                future = _submit_order_in_background(ib, actual_symbol, action, quantity, exchange=exchange, sec_type=sec_type, conId=actual_conId, close_position=is_close)
+                                order_result = {"status": "Submitted", "symbol": symbol, "action": action, "quantity": quantity, "exchange": exchange}
+                                fs_result = send_feishu(f"✅ 订单已提交: {symbol} {action} {quantity}", chat_id)
                         except Exception as e:
                             err_str = tb_module.format_exc()
                             _debug(f"[FEISHU] IB/connect EXCEPTION: {type(e).__name__}: {e}\n{err_str}", )
@@ -739,6 +778,51 @@ def test_api():
     """测试API方式"""
     success, result = send_feishu("🧪 测试消息")
     return jsonify({"success": success, "result": result})
+
+
+@app.route("/positions", methods=["GET"])
+def get_positions_endpoint():
+    """Get current positions"""
+    try:
+        from client.ib_connection import get_ib_manager
+        manager = get_ib_manager()
+        ib = manager.get_connection()
+        positions = manager.run_sync(lambda: ib.positions(), timeout=10)
+        result = []
+        for p in positions:
+            result.append({
+                "symbol": p.contract.symbol,
+                "position": p.position,
+                "avgCost": p.avgCost,
+                "account": p.account,
+                "contract": str(p.contract),
+            })
+        return jsonify({"positions": result, "count": len(result)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/orders", methods=["GET"])
+def get_orders_endpoint():
+    """Get open orders"""
+    try:
+        from client.ib_connection import get_ib_manager
+        manager = get_ib_manager()
+        ib = manager.get_connection()
+        trades = manager.run_sync(lambda: ib.openTrades(), timeout=10)
+        result = []
+        for t in trades:
+            result.append({
+                "orderId": t.order.orderId,
+                "symbol": t.contract.symbol,
+                "action": t.order.action,
+                "quantity": t.order.totalQuantity,
+                "status": t.orderStatus.status,
+                "filled": t.orderStatus.filled,
+            })
+        return jsonify({"orders": result, "count": len(result)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/health", methods=["GET"])

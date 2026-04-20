@@ -1,144 +1,233 @@
 #!/usr/bin/env python3
-"""
-IB Connection Manager - Singleton pattern with auto-reconnect
-用于 webhook 服务的持久化 IB 连接
+"""IB Connection Manager - 请求队列方案
+
+核心设计：
+1. 不用 loop.run_forever()（避免与 run_until_complete 冲突）
+2. IB 线程用 queue.Queue() 等待请求
+3. 每个请求用 ib.xxx() → util.run() → run_until_complete() 处理
+4. run_until_complete() 在执行期间会处理 socket 事件，所以请求能正常完成
+
+这个方案解决了核心矛盾：
+- 之前：run_forever() 与 run_until_complete() 冲突
+- 现在：不用 run_forever()，每次请求用 run_until_complete() 完成后循环继续等待下一个请求
 """
 
-import os
-import sys
-import threading
-import logging
-from typing import Optional
+import os, sys, threading, logging, asyncio, queue
+from typing import Optional, Callable, Any
 
-# 添加项目路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
 from ib_insync import IB
 from config import load_config, get_ibkr_host, get_ibkr_port
 
-# 加载配置
 load_config()
-
 logger = logging.getLogger(__name__)
 
 
 class IBConnectionManager:
-    """IB 连接管理器 - 单例模式，线程安全，支持自动重连"""
+    """IB 连接管理器 - 请求队列方案"""
     
     _instance: Optional["IBConnectionManager"] = None
     _lock = threading.Lock()
     
     def __init__(self):
         self._ib: Optional[IB] = None
-        self._host: str = get_ibkr_host()
-        self._port: int = get_ibkr_port()
-        self._client_id: int = 0  # Webhook 使用 clientId=0
-        self._connected: bool = False
-        self._connection_lock = threading.Lock()
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._host = get_ibkr_host()
+        self._port = get_ibkr_port()
+        self._client_id: int = 999  # 避免与 IB Gateway 自己使用的 clientId=0 冲突
+        self._thread: Optional[threading.Thread] = None
+        self._ready = threading.Event()
+        self._error: Optional[Exception] = None
+        self._request_queue: queue.Queue = queue.Queue()
+        self._running = False
     
     @classmethod
     def get_instance(cls) -> "IBConnectionManager":
-        """获取单例实例"""
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
                     cls._instance = cls()
         return cls._instance
     
-    def get_connection(self) -> IB:
-        """获取 IB 连接（自动重连）"""
-        with self._connection_lock:
-            if self._ib is None or not self._ib.isConnected():
-                self._connect()
-            return self._ib
+    def start(self, timeout: float = 15.0) -> IB:
+        """启动 IB 连接（在后台线程中）"""
+        if self._thread is not None and self._thread.is_alive():
+            if self._ib and self._ib.isConnected():
+                return self._ib
+            if self._ready.wait(timeout=0.1):
+                if self._ib and self._ib.isConnected():
+                    return self._ib
+        
+        self._ready.clear()
+        self._thread = threading.Thread(target=self._run_loop, daemon=True, name="IB-Worker")
+        self._thread.start()
+        
+        if not self._ready.wait(timeout=timeout):
+            raise TimeoutError(f"IB 连接超时 ({timeout}s)")
+        if self._error:
+            raise self._error
+        if not self._ib or not self._ib.isConnected():
+            raise RuntimeError("IB 连接失败")
+        return self._ib
     
-    def _connect(self):
-        """建立连接"""
+    def _run_loop(self):
+        """IB 工作线程 - 处理请求队列"""
         try:
-            if self._ib is not None and self._ib.isConnected():
-                return
+            # 创建事件循环
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
             
-            logger.info(f"🔌 连接 IB Gateway: {self._host}:{self._port} (clientId={self._client_id})")
+            # 创建 IB 实例并连接
             self._ib = IB()
             self._ib.connect(self._host, self._port, clientId=self._client_id, timeout=10)
-            self._connected = True
-            logger.info("✅ IB 连接已建立")
-        except Exception as e:
-            logger.error(f"❌ IB 连接失败: {e}")
-            self._connected = False
-            raise
-    
-    def reconnect(self) -> IB:
-        """强制重连"""
-        with self._connection_lock:
-            logger.info("🔄 强制重连 IB...")
-            if self._ib is not None and self._ib.isConnected():
+            
+            if not self._ib.isConnected():
+                self._error = RuntimeError("IB 连接失败")
+                self._ready.set()
+                return
+            
+            logger.info(f"[IB] Connected (clientId={self._client_id})")
+            self._ready.set()
+            self._running = True
+            
+            # 主循环：从队列获取请求并执行
+            while self._running:
+                try:
+                    # 等待请求（最多等待 1 秒，然后检查 _running 标志）
+                    request = self._request_queue.get(timeout=1.0)
+                except queue.Empty:
+                    continue
+                
+                if request is None:  # 停止信号
+                    break
+                
+                fn, result_queue = request['fn'], request['result_queue']
+                try:
+                    # 在此线程中执行 fn()（会调用 util.run() → run_until_complete()）
+                    # run_until_complete() 会处理 socket 事件，所以请求能正常完成
+                    result = fn()
+                    result_queue.put(('ok', result))
+                except Exception as e:
+                    logger.error(f"[IB] Request error: {e}")
+                    result_queue.put(('error', e))
+            
+            # 清理
+            if self._ib and self._ib.isConnected():
                 try:
                     self._ib.disconnect()
+                    logger.info("[IB] Disconnected")
                 except:
                     pass
-            self._ib = None
-            self._connected = False
-            return self._connect_and_return()
+                    
+        except Exception as e:
+            self._error = e
+            self._ready.set()
+            logger.error(f"[IB] Error: {e}")
     
-    def _connect_and_return(self) -> IB:
-        """连接并返回 IB 实例"""
-        self._connect()
-        return self._ib
+    def get_connection(self) -> IB:
+        """获取 IB 连接"""
+        return self.start()
+    
+    def run_sync(self, fn: Callable[..., Any], timeout: float = 30.0) -> Any:
+        """
+        在 IB 线程中执行同步函数。
+        
+        Args:
+            fn: 要执行的函数（如 lambda: ib.reqContractDetails(contract)）
+            timeout: 超时时间（秒）
+        
+        Returns:
+            fn() 的返回值
+        
+        Raises:
+            TimeoutError: 超时
+            Exception: fn() 抛出的异常
+        """
+        if not self._running:
+            raise RuntimeError("IB 线程未运行")
+        
+        result_queue = queue.Queue()
+        self._request_queue.put({'fn': fn, 'result_queue': result_queue})
+        
+        try:
+            status, value = result_queue.get(timeout=timeout)
+        except queue.Empty:
+            raise TimeoutError(f"IB 操作超时 ({timeout}s)")
+        
+        if status == 'error':
+            raise value
+        return value
     
     def is_connected(self) -> bool:
-        """检查连接状态"""
-        if self._ib is None:
-            return False
-        return self._ib.isConnected()
+        return self._ib is not None and self._ib.isConnected()
     
     def disconnect(self):
-        """断开连接"""
-        with self._connection_lock:
-            if self._ib is not None and self._ib.isConnected():
-                try:
-                    self._ib.disconnect()
-                    logger.info("🔌 IB 连接已断开")
-                except:
-                    pass
-            self._connected = False
-    
-    def get_ib(self) -> Optional[IB]:
-        """获取原始 IB 实例（不自动重连）"""
-        return self._ib
+        """断开 IB 连接"""
+        self._running = False
+        self._request_queue.put(None)  # 发送停止信号
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=5)
 
 
-# 全局访问函数
-_ib_connection_manager: Optional[IBConnectionManager] = None
+_manager: Optional[IBConnectionManager] = None
 
 
 def get_ib_connection() -> IB:
-    """获取 IB 连接的全局函数"""
-    global _ib_connection_manager
-    if _ib_connection_manager is None:
-        _ib_connection_manager = IBConnectionManager.get_instance()
-    return _ib_connection_manager.get_connection()
+    """获取 IB 连接（单例）"""
+    global _manager
+    if _manager is None:
+        _manager = IBConnectionManager.get_instance()
+    return _manager.get_connection()
 
 
 def get_ib_manager() -> IBConnectionManager:
-    """获取连接管理器实例"""
-    global _ib_connection_manager
-    if _ib_connection_manager is None:
-        _ib_connection_manager = IBConnectionManager.get_instance()
-    return _ib_connection_manager
-
-
-# 兼容旧代码 - 提供类似原有 get_client_id 的功能
-def get_client_id() -> int:
-    """获取 clientId (webhook 固定为 0)"""
-    return 0
+    """获取 IB 管理器（单例）"""
+    global _manager
+    if _manager is None:
+        _manager = IBConnectionManager.get_instance()
+    return _manager
 
 
 if __name__ == "__main__":
-    # 测试连接
-    print("测试 IB Connection Manager...")
-    ib = get_ib_connection()
-    print(f"连接状态: {ib.isConnected()}")
-    print(f"账户: {ib.accountSummary()[:2]}")
-    get_ib_manager().disconnect()
-    print("完成")
+    print("=" * 60)
+    print("Testing IB Connection Manager (Queue-based)")
+    print("=" * 60)
+    
+    manager = get_ib_manager()
+    ib = manager.get_connection()
+    print(f"[OK] Connected: {ib.isConnected()}")
+    
+    from ib_insync import Future
+    
+    # Test 1: reqContractDetails
+    print("\nTest 1: ib.reqContractDetails()")
+    contract = Future("GC", exchange="COMEX", currency="USD")
+    t0 = __import__('time').time()
+    result = manager.run_sync(lambda: ib.reqContractDetails(contract), timeout=10)
+    print(f"   [OK] Got {len(result)} contracts ({__import__('time').time()-t0:.2f}s)")
+    
+    # Test 2: positions
+    print("\nTest 2: ib.positions()")
+    t0 = __import__('time').time()
+    positions = manager.run_sync(lambda: ib.positions(), timeout=10)
+    print(f"   [OK] Got {len(positions)} positions ({__import__('time').time()-t0:.2f}s)")
+    for pos in positions[:3]:
+        print(f"      - {pos.contract.symbol}: {pos.position}")
+    
+    # Test 3: cross-thread call
+    print("\nTest 3: Cross-thread call")
+    def worker():
+        t0 = __import__('time').time()
+        result = manager.run_sync(lambda: ib.reqContractDetails(contract), timeout=10)
+        print(f"   [OK] [Worker] Got {len(result)} contracts ({__import__('time').time()-t0:.2f}s)")
+    
+    import threading
+    t = threading.Thread(target=worker)
+    t.start()
+    t.join(timeout=15)
+    
+    print("\n" + "=" * 60)
+    print("[OK] All tests passed!")
+    print("=" * 60)
+    
+    manager.disconnect()

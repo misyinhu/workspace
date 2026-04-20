@@ -35,8 +35,8 @@ TIMEFRAME_LABELS = {
 TREND_EMOJI = {"up": "📈", "down": "📉", "neutral": "➡️"}
 TREND_CN = {"up": "上涨", "down": "下跌", "neutral": "震荡"}
 
-# quant-core API 配置
-QUANT_CORE_URL = "http://100.82.238.11:8000"
+# quant-core API 配置 (远程服务器)
+QUANT_CORE_URL = "http://100.82.238.11:8005"
 USE_MOCK_DATA = False  # 使用真实 quant-core API
 
 # 常用品种配置文件路径
@@ -77,33 +77,41 @@ def get_source_for_symbol(symbol: str) -> str:
         for inst in config_instruments:
             if inst["symbol"] == symbol:
                 return inst.get("source", "okx")
-    return "okx"
+    # 默认使用 tradingview 为未配置的品种
+    return "tradingview"
 
 
 def fetch_multi_timeframe(symbol: str) -> dict:
-    if USE_MOCK_DATA:
-        return mock_multi_timeframe(symbol)
-    
-    source = get_source_for_symbol(symbol)
-    
-    if source == "tradingview":
-        intervals = ",".join(TIMEFRAMES)
-        try:
-            response = requests.get(
-                f"{QUANT_CORE_URL}/api/tv/multi-timeframe",
-                params={
-                    "symbol": symbol,
-                    "intervals": intervals
-                },
-                timeout=15
-            )
-            if response.status_code == 200:
-                data = response.json()
-                return convert_tv_to_app_format(data)
-        except Exception as e:
-            pass
-    
-    return fetch_from_history(symbol, source)
+    # 3兜底和4回退已移除，严格按照：主数据源优先，主源无数据再回退到 TradingView
+    # 不使用 Mock 数据作为兜底方案
+    # 1) 主数据源优先
+    primary_source = get_source_for_symbol(symbol)  # e.g. "ib", "okx", "tradingview"（默认）
+    intervals = ",".join(TIMEFRAMES)
+
+    if primary_source and primary_source != "tradingview":
+        primary_data = fetch_from_history(symbol, primary_source)
+        tf_data = primary_data.get("timeframes", {})
+        has_valid = any(v.get("close", 0) > 0 for v in tf_data.values())
+        if has_valid:
+            return primary_data
+
+    # 2) TradingView 回退（如果主源不可用或数据无效）
+    try:
+        response = requests.get(
+            f"{QUANT_CORE_URL}/api/tv/multi-timeframe",
+            params={
+                "symbol": symbol,
+                "intervals": intervals
+            },
+            timeout=15
+        )
+        if response.status_code == 200:
+            data = response.json()
+            return convert_tv_to_app_format(data)
+    except Exception:
+        pass
+    # 3) 未取得数据，告知前端
+    return {"symbol": symbol, "timeframes": {}, "resonance": {}, "error": "no_data"}
 
 
 def convert_tv_to_app_format(tv_data: dict) -> dict:
@@ -384,7 +392,6 @@ def generate_mock_ohlc(symbol: str, timeframe: str, periods: int = 100) -> pd.Da
 
 
 def mock_multi_timeframe(symbol: str) -> dict:
-    """Mock 多周期数据"""
     result = {"symbol": symbol, "timeframes": {}, "resonance": {}}
     directions = []
     
@@ -392,22 +399,21 @@ def mock_multi_timeframe(symbol: str) -> dict:
         ohlc = generate_mock_ohlc(symbol, tf)
         trend = calculate_trend(ohlc)
         
-        # 转换为英文
         direction_en = "up" if trend["direction"] == "上涨" else "down" if trend["direction"] == "下跌" else "neutral"
         directions.append(direction_en)
         
-        latest = ohlc.iloc[-1] if len(ohlc) > 0 else None
-        prev = ohlc.iloc[-2] if len(ohlc) > 1 else None
-        change_pct = ((latest['close'] - prev['close']) / prev['close'] * 100) if latest and prev else 0
+        closes = ohlc["close"].values
+        latest_close = closes[-1]
+        prev_close = closes[-2] if len(closes) > 1 else latest_close
+        change_pct = ((latest_close - prev_close) / prev_close * 100) if prev_close else 0
         
         result["timeframes"][tf] = {
             "trend": direction_en,
-            "close": latest['close'] if latest else 0,
+            "close": latest_close,
             "change_pct": round(change_pct, 2),
-            "ma20": round(np.mean(ohlc['close'].values[-20:]), 2) if len(ohlc) >= 20 else 0
+            "ma20": round(np.mean(closes[-20:]), 2) if len(closes) >= 20 else 0
         }
     
-    # 计算共振
     resonance = calculate_resonance_en(directions)
     result["resonance"] = resonance
     
@@ -415,15 +421,15 @@ def mock_multi_timeframe(symbol: str) -> dict:
 
 
 def calculate_trend(ohlc_df: pd.DataFrame) -> dict:
-    """Calculate trend direction based on price action."""
     if len(ohlc_df) < 20:
         return {"direction": "震荡", "strength": 50}
     
     closes = ohlc_df["close"].values
+    n = len(closes)
     
     sma_short = np.mean(closes[-10:])
-    sma_medium = np.mean(closes[-30:])
-    sma_long = np.mean(closes[-60:]) if len(closes) >= 60 else sma_medium
+    sma_medium = np.mean(closes[-30:]) if n >= 30 else np.mean(closes[-n:])
+    sma_long = np.mean(closes[-60:]) if n >= 60 else sma_medium
     
     if sma_short > sma_medium > sma_long:
         direction = "上涨"
@@ -432,8 +438,9 @@ def calculate_trend(ohlc_df: pd.DataFrame) -> dict:
     else:
         direction = "震荡"
     
-    price_range = np.max(closes[-30:]) - np.min(closes[-30:])
-    recent_change = (closes[-1] - closes[-30]) / closes[-30] * 100 if price_range > 0 else 0
+    recent_len = min(30, n)
+    price_range = np.max(closes[-recent_len:]) - np.min(closes[-recent_len:])
+    recent_change = (closes[-1] - closes[-recent_len]) / closes[-recent_len] * 100 if price_range > 0 else 0
     
     strength = min(100, max(0, 50 + recent_change * 10))
     
@@ -441,7 +448,6 @@ def calculate_trend(ohlc_df: pd.DataFrame) -> dict:
 
 
 def calculate_resonance_en(directions: list) -> dict:
-    """Calculate resonance score with English labels."""
     up_count = directions.count("up")
     down_count = directions.count("down")
     neutral_count = directions.count("neutral")
@@ -452,8 +458,11 @@ def calculate_resonance_en(directions: list) -> dict:
     elif up_count + down_count >= 3:
         score = 50 + (up_count + down_count - 3) * 5
         level = "medium"
-    else:
+    elif directions:
         score = 30 + neutral_count * 5
+        level = "low"
+    else:
+        score = 0
         level = "low"
     
     score = min(100, max(0, score))
@@ -643,6 +652,9 @@ def main():
             timeframe_data = data.get("timeframes", {})
             resonance_data = data.get("resonance", {})
         
+        if not timeframe_data:
+            st.error("无法获取数据，请稍后重试")
+            return
         render_main_content(timeframe_data, resonance_data, selected_symbol)
 
 
