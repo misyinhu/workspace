@@ -307,14 +307,177 @@ def send_feishu(text, receive_id=None):
 
 
 def execute_command(cmd):
-    """执行命令并返回结果"""
+    """执行命令并返回结果（Windows UTF-8 兼容）"""
     try:
-        result = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True, timeout=30, cwd=get_project_root()
-        )
-        return result.stdout + result.stderr
+        import sys
+        # Windows 需要特殊处理编码
+        if sys.platform == "win32":
+            import subprocess
+            result = subprocess.run(
+                cmd, shell=True, capture_output=True, timeout=30, cwd=get_project_root()
+            )
+            # 手动解码，避免 GBK 错误
+            stdout = result.stdout.decode('utf-8', errors='replace') if result.stdout else ""
+            stderr = result.stderr.decode('utf-8', errors='replace') if result.stderr else ""
+            return stdout + stderr
+        else:
+            result = subprocess.run(
+                cmd, shell=True, capture_output=True, text=True, timeout=30, cwd=get_project_root()
+            )
+            return result.stdout + result.stderr
     except Exception as e:
         return str(e)
+
+
+def _get_ib():
+    """获取 IB 连接，未连接时返回 None"""
+    ib = get_ib_connection()
+    if ib is None or not ib.isConnected():
+        return None
+    return ib
+
+
+def get_positions_formatted():
+    """获取格式化持仓"""
+    try:
+        ib = _get_ib()
+        if ib is None:
+            return "❌ IB 未连接"
+        positions = ib.positions()
+        if not positions:
+            return "📊 当前无持仓"
+        lines = ["**📊 当前持仓**\n"]
+        for pos in positions:
+            symbol = pos.contract.symbol
+            sec_type = pos.contract.secType
+            position = pos.position
+            avg_cost = pos.avgCost
+            if position == 0:
+                continue
+            pos_str = f"{position:+.0f}" if position != int(position) else f"{int(position):+}"
+            cost_str = f"{avg_cost:.2f}" if avg_cost else "N/A"
+            lines.append(f"• {symbol} ({sec_type}): {pos_str} @ {cost_str}")
+        if len(lines) == 1:
+            return "📊 当前无持仓"
+        return "\n".join(lines)
+    except Exception as e:
+        return f"❌ 获取持仓失败: {e}"
+
+
+def get_account_summary_formatted():
+    """获取格式化账户摘要"""
+    try:
+        ib = _get_ib()
+        if ib is None:
+            return "❌ IB 未连接"
+        summary = ib.accountSummary()
+        if not summary:
+            return "📊 无账户数据"
+        # 提取关键字段
+        key_tags = {
+            "NetLiquidation": "净值",
+            "UnrealizedPnL": "未实现盈亏",
+            "RealizedPnL": "已实现盈亏",
+            "AvailableFunds": "可用资金",
+            "BuyingPower": "购买力",
+            "TotalCashValue": "现金",
+            "GrossPositionValue": "持仓市值",
+            "MaintMarginReq": "维持保证金",
+        }
+        lines = ["**💰 账户摘要**\n"]
+        tag_map = {}
+        for item in summary:
+            tag_map[item.tag] = item
+        for tag, label in key_tags.items():
+            if tag in tag_map:
+                val = tag_map[tag].value
+                currency = tag_map[tag].currency
+                try:
+                    num = float(val)
+                    lines.append(f"• {label}: {num:,.2f} {currency}")
+                except (ValueError, TypeError):
+                    lines.append(f"• {label}: {val} {currency}")
+        return "\n".join(lines)
+    except Exception as e:
+        return f"❌ 获取账户摘要失败: {e}"
+
+
+def get_orders_formatted():
+    """获取格式化订单列表"""
+    try:
+        ib = _get_ib()
+        if ib is None:
+            return "❌ IB 未连接"
+        trades = ib.trades()
+        if not trades:
+            return "📋 当前无订单"
+        pending, filled, cancelled, inactive = [], [], [], []
+        for trade in trades:
+            os = trade.orderStatus
+            c = trade.contract
+            order_info = {
+                "orderId": trade.order.orderId,
+                "symbol": c.localSymbol if hasattr(c, "localSymbol") and c.localSymbol else c.symbol,
+                "action": trade.order.action,
+                "quantity": trade.order.totalQuantity,
+                "filled": os.filled,
+                "remaining": os.remaining,
+                "avgFillPrice": os.avgFillPrice,
+                "status": os.status,
+            }
+            if os.status in {"Submitted", "PendingSubmit", "PreSubmitted", "Active", "ApiPending"}:
+                pending.append(order_info)
+            elif os.status in {"Filled", "ApiTraded"}:
+                filled.append(order_info)
+            elif os.status in {"Cancelled", "ApiCancelled"}:
+                cancelled.append(order_info)
+            else:
+                inactive.append(order_info)
+        lines = ["**📋 订单状态**\n"]
+        if pending:
+            lines.append(f"🔄 待成交 ({len(pending)} 单)")
+            for o in pending:
+                lines.append(f"  • {o['symbol']}: {o['action']} {o['filled']:.0f}/{o['quantity']} ({o['status']})")
+        if filled:
+            lines.append(f"\n✅ 已成交 ({len(filled)} 单)")
+            for o in filled:
+                lines.append(f"  • {o['symbol']}: {o['action']} {o['filled']:.0f}/{o['quantity']} @ ${o['avgFillPrice']:.2f}")
+        if cancelled:
+            lines.append(f"\n❌ 已取消 ({len(cancelled)} 单)")
+            for o in cancelled:
+                lines.append(f"  • {o['symbol']}: {o['action']} {o['quantity']}")
+        if inactive:
+            lines.append(f"\n⏸ 未激活 ({len(inactive)} 单)")
+            for o in inactive:
+                lines.append(f"  • {o['symbol']}: {o['action']} {o['quantity']} ({o['status']})")
+        if len(lines) == 1:
+            return "📋 当前无订单"
+        return "\n".join(lines)
+    except Exception as e:
+        return f"❌ 获取订单失败: {e}"
+
+
+def get_fills_formatted():
+    """获取格式化成交记录"""
+    try:
+        ib = _get_ib()
+        if ib is None:
+            return "❌ IB 未连接"
+        fills = ib.fills()
+        if not fills:
+            return "📊 今日无成交"
+        lines = ["**📊 成交记录**\n"]
+        for fill in fills:
+            symbol = fill.contract.symbol
+            action = fill.execution.side
+            qty = fill.execution.cumQty
+            price = fill.execution.price
+            commission = fill.commissionReport.commission if fill.commissionReport else 0
+            exec_time = fill.execution.time.strftime("%H:%M:%S") if fill.execution.time else ""
+            lines.append(f"• {symbol}: {action} {qty} @ ${price:.2f} (手续费 ${commission:.2f}) {exec_time}")
+        return "\n".join(lines)
+    except Exception as e:
+        return f"❌ 获取成交记录失败: {e}"
 
 
 def get_help_text():
@@ -490,19 +653,11 @@ COMMANDS = {
         set_query_only(True) or globals().__setitem__("QUERY_ONLY", True),
         "🔒 **已切换到仅查询模式**\n\n现在仅允许查询操作，不允许下单。",
     )[1],
-    # 查询类
-    "持仓": lambda: execute_command(
-        f"{get_python_cmd()} {Path(PROJECT_ROOT) / 'account' / 'get_positions.py'}"
-    ),
-    "账户": lambda: execute_command(
-        f"{get_python_cmd()} {Path(PROJECT_ROOT) / 'account' / 'get_account_summary.py'}"
-    ),
-    "订单": lambda: execute_command(
-        f"{get_python_cmd()} {Path(PROJECT_ROOT) / 'orders' / 'get_orders.py'}"
-    ),
-    "成交": lambda: execute_command(
-        f"{get_python_cmd()} {Path(PROJECT_ROOT) / 'account' / 'get_trades.py'}"
-    ),
+    # 查询类（内联，复用 webhook IB 连接）
+    "持仓": lambda: get_positions_formatted(),
+    "账户": lambda: get_account_summary_formatted(),
+    "订单": lambda: get_orders_formatted(),
+    "成交": lambda: get_fills_formatted(),
     "help": lambda: get_help_text(),
     # 多周期分析
     "多周期分析": lambda: run_multi_timeframe_analysis(),

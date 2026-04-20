@@ -5,6 +5,18 @@ import json
 from typing import List, Dict, Any, Optional
 from ib_insync import IB
 
+# 确保使用正确的 Python 环境（虚拟环境支持）
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+try:
+    from config.env_config import ensure_venv
+    ensure_venv()
+except ImportError:
+    pass
+
+from client.ibkr_client import get_client_id, IBKR_HOST, IBKR_PORT
+
+ib = IB()
+result = {}
 
 def get_positions(ib: Optional[IB] = None) -> List[Dict[str, Any]]:
     if ib is None:
@@ -56,4 +68,9 @@ if __name__ == "__main__":
     import sys
     import os
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-    print(json.dumps(get_positions(), indent=2, default=str))
+    # 设置UTF-8编码（Windows兼容）
+    if sys.platform == "win32":
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    # 输出格式化后的持仓信息（用于飞书消息）
+    print(format_positions())
