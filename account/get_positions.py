@@ -1,38 +1,59 @@
 #!/usr/bin/env python3
-"""获取当前持仓 - 通过 HTTP 调用 webhook 的 /positions 端点"""
+"""获取当前持仓"""
 
 import json
-import sys
-import os
+from typing import List, Dict, Any, Optional
+from ib_insync import IB
 
-# 调用 webhook 的 /positions 端点
-import urllib.request
 
-try:
-    req = urllib.request.Request(
-        "http://127.0.0.1:5002/positions",
-        method="GET",
-        headers={"Accept": "application/json"}
-    )
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        data = json.loads(resp.read().decode('utf-8'))
-        
-    if "error" in data:
-        print(json.dumps({"error": data["error"]}, indent=2))
-        sys.exit(1)
+def get_positions(ib: Optional[IB] = None) -> List[Dict[str, Any]]:
+    if ib is None:
+        from client.ib_connection import get_ib_connection
+        ib = get_ib_connection()
     
-    # 转换为旧格式兼容
+    positions = ib.positions()
     result = []
-    for p in data.get("positions", []):
+    for pos in positions:
         result.append({
-            "symbol": p.get("symbol", ""),
-            "secType": "FUT" if p.get("symbol", "").startswith(("GC", "MGC", "CL", "MNQ")) else "CRYPTO",
-            "exchange": "",
-            "position": p.get("position", 0),
-            "avgCost": p.get("avgCost", 0),
-            "account": "DUH583159",
+            "symbol": pos.contract.symbol,
+            "secType": pos.contract.secType,
+            "exchange": pos.contract.exchange,
+            "position": pos.position,
+            "avgCost": pos.avgCost,
+            "account": pos.account,
         })
-    print(json.dumps(result, indent=2, default=str))
-except Exception as e:
-    print(json.dumps({"error": str(e)}, indent=2))
-    sys.exit(1)
+    return result
+
+
+def format_positions(ib: Optional[IB] = None) -> str:
+    positions = get_positions(ib)
+    
+    if not positions:
+        return "📊 当前无持仓"
+    
+    lines = ["**📊 当前持仓**\n"]
+    for pos in positions:
+        symbol = pos.get("symbol", "")
+        sec_type = pos.get("secType", "")
+        position = pos.get("position", 0)
+        avg_cost = pos.get("avgCost", 0)
+        
+        if position == 0:
+            continue
+            
+        position_str = f"{position:+.0f}" if position != int(position) else f"{int(position):+}"
+        cost_str = f"{avg_cost:.2f}" if avg_cost else "N/A"
+        
+        lines.append(f"• {symbol} ({sec_type}): {position_str} @ {cost_str}")
+    
+    if len(lines) == 1:
+        return "📊 当前无持仓"
+    
+    return "\n".join(lines)
+
+
+if __name__ == "__main__":
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+    print(json.dumps(get_positions(), indent=2, default=str))
