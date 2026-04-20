@@ -19,10 +19,15 @@ CMDTY_SYMBOLS = {
 TRADING_PATTERNS = [
     # 平仓 patterns (优先匹配)
     (r"平掉(\S+?)(?:仓|位)$", "CLOSE"),
+    (r"平仓(\d+)单元(\S+)$", "CLOSE"),  # 平仓1单元gc
+    (r"平仓(\d+)手(\S+)$", "CLOSE"),    # 平仓1手gc
     (r"平仓(\S+)$", "CLOSE"),
     (r"清仓$", "CLOSE"),
     
     # 卖出/做空 patterns (支持"手"和"股")
+    (r"卖空(\d+)单元(\S+)$", "SELL"),  # 卖空1单元gc
+    (r"卖出(\d+)单元(\S+)$", "SELL"),  # 卖出1单元gc
+    (r"做空(\d+)单元(\S+)$", "SELL"),  # 做空1单元gc
     (r"卖空(\d+)(?:手|股)(\S+)$", "SELL"),
     (r"做空(\d+)(?:手|股)(\S+)$", "SELL"),
     (r"卖出(\d+)(?:手|股)(\S+)$", "SELL"),
@@ -31,6 +36,8 @@ TRADING_PATTERNS = [
     (r"卖(\d+)$", "SELL"),  # 卖1 = 卖1手GC
     
     # 买入 patterns (支持"手"和"股")
+    (r"买入(\d+)单元(\S+)$", "BUY"),  # 买入1单元gc
+    (r"做多(\d+)单元(\S+)$", "BUY"),   # 做多1单元gc
     (r"买入(\d+)(?:手|股)(\S+)$", "BUY"),
     (r"做多(\d+)(?:手|股)(\S+)$", "BUY"),
     (r"买(\d+)(?:手|股)(\S+)$", "BUY"),
@@ -81,8 +88,11 @@ def parse_trading_command(message: str) -> Dict[str, Any]:
             if quantity is not None:
                 result["quantity"] = quantity
             if symbol:
-                # 清理 symbol
+                # 清理 symbol - 移除 "单元"、"手"、"股" 等后缀
                 symbol = symbol.upper().strip()
+                symbol = re.sub(r"(单元|手|股)$", "", symbol)
+                symbol = symbol.strip()
+                
                 symbol_map = {
                     "BTC": "BTC", "比特币": "BTC",
                     "黄金": "GC", "黄金": "GC",
