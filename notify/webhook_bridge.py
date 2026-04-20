@@ -28,7 +28,7 @@ import yaml
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 sys.path.insert(0, PROJECT_ROOT)
 from config import load_config, is_query_only, set_query_only, get_webhook_port, get_project_root
-from client.ib_connection import get_ib_connection
+from client.ib_connection import get_ib_connection, get_ib_manager
 from notify.nl_parser import parse_trading_command
 from concurrent.futures import ThreadPoolExecutor
 import threading
@@ -337,12 +337,19 @@ def _get_ib():
     return ib
 
 
+def _run_ib(fn, timeout=15.0):
+    """在 IB 线程中执行函数（通过 run_sync 队列）"""
+    manager = get_ib_manager()
+    return manager.run_sync(fn, timeout=timeout)
+
+
 def get_positions_formatted():
     """获取格式化持仓"""
     try:
         ib = _get_ib()
         if ib is None:
             return "❌ IB 未连接"
+        # positions 是缓存数据，可以直接读取
         positions = ib.positions()
         if not positions:
             return "📊 当前无持仓"
@@ -365,15 +372,14 @@ def get_positions_formatted():
 
 
 def get_account_summary_formatted():
-    """获取格式化账户摘要"""
+    """获取格式化账户摘要（通过 run_sync 在 IB 线程执行）"""
     try:
         ib = _get_ib()
         if ib is None:
             return "❌ IB 未连接"
-        summary = ib.accountSummary()
+        summary = _run_ib(lambda: ib.accountSummary(), timeout=15)
         if not summary:
             return "📊 无账户数据"
-        # 提取关键字段
         key_tags = {
             "NetLiquidation": "净值",
             "UnrealizedPnL": "未实现盈亏",
@@ -403,12 +409,12 @@ def get_account_summary_formatted():
 
 
 def get_orders_formatted():
-    """获取格式化订单列表"""
+    """获取格式化订单列表（通过 run_sync 在 IB 线程执行）"""
     try:
         ib = _get_ib()
         if ib is None:
             return "❌ IB 未连接"
-        trades = ib.trades()
+        trades = _run_ib(lambda: ib.trades(), timeout=10)
         if not trades:
             return "📋 当前无订单"
         pending, filled, cancelled, inactive = [], [], [], []
@@ -458,12 +464,12 @@ def get_orders_formatted():
 
 
 def get_fills_formatted():
-    """获取格式化成交记录"""
+    """获取格式化成交记录（通过 run_sync 在 IB 线程执行）"""
     try:
         ib = _get_ib()
         if ib is None:
             return "❌ IB 未连接"
-        fills = ib.fills()
+        fills = _run_ib(lambda: ib.fills(), timeout=10)
         if not fills:
             return "📊 今日无成交"
         lines = ["**📊 成交记录**\n"]
