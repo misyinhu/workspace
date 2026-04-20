@@ -54,6 +54,49 @@ def _submit_order_in_background(ib, symbol, action, quantity, exchange=None, sec
             return {"error": str(e)}
     return _order_executor.submit(_order_job)
 
+
+# ============ execDetails 回调 - 成交实时通知 ============
+_fill_notified = set()  # 已通知的 execId，避免重复
+
+def _on_exec_details(trade, fill):
+    """IB 成交回调 - 通过飞书实时推送"""
+    try:
+        exec_id = fill.execution.execId
+        if exec_id in _fill_notified:
+            return
+        _fill_notified.add(exec_id)
+
+        contract = trade.contract
+        symbol = getattr(contract, 'localSymbol', contract.symbol)
+        side = fill.execution.side
+        qty = fill.execution.shares
+        price = fill.execution.price
+        avg_price = fill.execution.avgPrice or price
+        real_pnl = getattr(fill, 'commissionReport', None)
+        commission = getattr(real_pnl, 'commission', 0) if real_pnl else 0
+
+        msg = f"📈 成交回报\n{symbol} {side} {qty} @ ${avg_price:.2f}"
+        if commission != 0:
+            msg += f"\n手续费: ${abs(commission):.2f}"
+
+        _debug(f"[FILL] {msg}")
+        send_feishu(msg, FEISHU_CONVERSATION_ID)
+    except Exception as e:
+        _debug(f"[FILL] callback error: {e}")
+
+
+def _register_fill_callback():
+    """注册 execDetails 回调到 IB 实例"""
+    try:
+        ib = get_ib_connection()
+        ib.execDetailsEvent.clear()  # 清除旧回调
+        ib.execDetailsEvent += _on_exec_details
+        _debug("[IB] execDetails callback registered")
+        print(f"[IB] execDetails callback registered", flush=True)
+    except Exception as e:
+        _debug(f"[IB] execDetails register failed: {e}")
+
+
 # 加载主配置
 load_config()
 
@@ -67,6 +110,8 @@ def _init_ib():
     try:
         ib = get_ib_connection()
         print(f"[IB] pre-connect: {ib}, connected={ib.isConnected()}")
+        # 注册 execDetails 成交回调
+        _register_fill_callback()
     except Exception as e:
         print(f"[IB] pre-connect failed (will retry on request): {e}")
     _ib_init_done = True

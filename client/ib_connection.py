@@ -96,6 +96,12 @@ class IBConnectionManager:
                     # 等待请求（最多等待 1 秒，然后检查 _running 标志）
                     request = self._request_queue.get(timeout=1.0)
                 except queue.Empty:
+                    # 事件泵：空闲时 pump 事件循环，让 execDetails 等回调能触发
+                    try:
+                        if self._loop and not self._loop.is_closed():
+                            self._loop.run_until_complete(asyncio.sleep(0))
+                    except Exception:
+                        pass
                     continue
                 
                 if request is None:  # 停止信号
