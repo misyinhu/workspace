@@ -1004,6 +1004,12 @@ def tv_webhook():
         else:
             title = data.get("title", "Webhook 警报")
             description = data.get("description", "")
+            
+            # 过滤掉 Z120 "无法获取当前价差" 警报（这类警报由 TradingView 频繁推送，无需转发到飞书）
+            if "无法获取当前价差" in title or "无法获取当前价差" in description:
+                print(f"[TV-WEBHOOK] 过滤掉 Z120 警报: {title}")
+                return jsonify({"status": "ok", "filtered": True})
+            
             success, result = send_feishu(f"{title}\n\n{description}")
             return jsonify({"status": "ok" if success else "error", "result": result})
 
