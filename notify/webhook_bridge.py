@@ -10,6 +10,7 @@ import sys
 # 首先应用 nest_asyncio patch（必须在导入 ib_insync 之前）
 try:
     from ib_insync.util import patchAsyncio
+
     patchAsyncio()
 except Exception:
     pass
@@ -27,7 +28,13 @@ import yaml
 # 添加配置路径
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 sys.path.insert(0, PROJECT_ROOT)
-from config import load_config, is_query_only, set_query_only, get_webhook_port, get_project_root
+from config import (
+    load_config,
+    is_query_only,
+    set_query_only,
+    get_webhook_port,
+    get_project_root,
+)
 from client.ib_connection import get_ib_connection, get_ib_manager
 from notify.nl_parser import parse_trading_command
 from concurrent.futures import ThreadPoolExecutor
@@ -37,26 +44,51 @@ import sys
 # Background executor for submitting orders without blocking HTTP request
 _order_executor = ThreadPoolExecutor(max_workers=4)
 
-def _submit_order_in_background(ib, symbol, action, quantity, exchange=None, sec_type=None, conId=None, close_position=False, outside_rth=None):
+
+def _submit_order_in_background(
+    ib,
+    symbol,
+    action,
+    quantity,
+    exchange=None,
+    sec_type=None,
+    conId=None,
+    close_position=False,
+    outside_rth=None,
+):
     """在后台提交订单，避免阻塞主线程。
-    
+
     对于期货（FUT）默认启用 outsideRth=True，允许盘前/盘后交易。
     """
     # 期货默认启用盘前交易
     if outside_rth is None:
         outside_rth = True  # 默认启用，支持期货盘前订单
+
     def _order_job():
         try:
             from orders.place_order_func import place_order
-            return place_order(ib, symbol, action, quantity, exchange=exchange, sec_type=sec_type, conId=conId, close_position=close_position, outside_rth=outside_rth)
+
+            return place_order(
+                ib,
+                symbol,
+                action,
+                quantity,
+                exchange=exchange,
+                sec_type=sec_type,
+                conId=conId,
+                close_position=close_position,
+                outside_rth=outside_rth,
+            )
         except Exception as e:
             print(f"[FEISHU] Background order error: {e}", file=sys.stderr)
             return {"error": str(e)}
+
     return _order_executor.submit(_order_job)
 
 
 # ============ execDetails 回调 - 成交实时通知 ============
 _fill_notified = set()  # 已通知的 execId，避免重复
+
 
 def _on_exec_details(trade, fill):
     """IB 成交回调 - 通过飞书实时推送"""
@@ -67,34 +99,36 @@ def _on_exec_details(trade, fill):
         _fill_notified.add(exec_id)
 
         contract = trade.contract
-        symbol = getattr(contract, 'localSymbol', contract.symbol)
-        exchange = getattr(contract, 'exchange', '')
+        symbol = getattr(contract, "localSymbol", contract.symbol)
+        exchange = getattr(contract, "exchange", "")
         side = fill.execution.side  # BOT/SLD
         qty = fill.execution.shares
         price = fill.execution.price
         avg_price = fill.execution.avgPrice or price
-        order_id = getattr(fill.execution, 'orderId', 0)
+        order_id = getattr(fill.execution, "orderId", 0)
         exec_time = fill.execution.time
-        
+
         # 获取盈亏信息
-        real_pnl = getattr(fill, 'commissionReport', None)
-        commission = getattr(real_pnl, 'commission', 0) if real_pnl else 0
-        realized_pnl = getattr(real_pnl, 'realizedPNL', 0) if real_pnl else 0
-        
+        real_pnl = getattr(fill, "commissionReport", None)
+        commission = getattr(real_pnl, "commission", 0) if real_pnl else 0
+        realized_pnl = getattr(real_pnl, "realizedPNL", 0) if real_pnl else 0
+
         # 翻译方向
         action_cn = "买入" if side == "BOT" else "卖出" if side == "SLD" else side
-        
+
         # 格式化时间 (直接用北京时间显示)
         # IB 的 exec_time 通常已经是 UTC，但有时需要特殊处理
         from datetime import timezone, timedelta
+
         beijing_tz = timezone(timedelta(hours=8))
-        
+
         if exec_time:
             # 打印原始时间调试
             _debug(f"[FILL] raw exec_time={exec_time}, repr={repr(exec_time)}")
-            
+
             # 直接用当前北京时间（因为 exec_time 可能不准确）
             from datetime import datetime
+
             local_time = datetime.now(beijing_tz)
             time_str = local_time.strftime("%H:%M:%S")
         else:
@@ -109,7 +143,7 @@ def _on_exec_details(trade, fill):
 价格: ${avg_price:,.2f}
 时间: {time_str}
 订单ID: {order_id}"""
-        
+
         if commission != 0:
             msg += f"\n手续费: ${abs(commission):,.2f}"
         if realized_pnl != 0:
@@ -140,6 +174,8 @@ load_config()
 # ============ 启动时预初始化 IB 连接 ============
 # 必须在 app.run() 前建立，否则第一个请求会卡在 connect(timeout=10) 里
 _ib_init_done = False
+
+
 def _init_ib():
     global _ib_init_done
     if _ib_init_done:
@@ -153,16 +189,21 @@ def _init_ib():
         print(f"[IB] pre-connect failed (will retry on request): {e}")
     _ib_init_done = True
 
+
 # 详细调试日志文件（写入 webhook_out.log）
 _DEBUG_LOG = os.path.join(os.path.dirname(__file__), "webhook_out.log")
+
+
 def _debug(msg):
     try:
         with open(_DEBUG_LOG, "a", encoding="utf-8") as f:
             import datetime
+
             f.write(f"[{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] {msg}\n")
         print(msg, flush=True)
     except Exception:
         pass  # 忽略打印错误
+
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
@@ -172,15 +213,26 @@ app = Flask(__name__)
 
 def load_feishu_config():
     """从 settings.yaml 加载飞书配置"""
-    from config import get_feishu_app_id, get_feishu_app_secret, get_feishu_chat_id, load_config, get
-    
+    from config import (
+        get_feishu_app_id,
+        get_feishu_app_secret,
+        get_feishu_chat_id,
+        load_config,
+        get,
+    )
+
     load_config()
     return {
         "app_id": get_feishu_app_id(),
         "app_secret": get_feishu_app_secret(),
         "chat_id": get_feishu_chat_id(),
-        "api_endpoint": get("feishu.api_endpoint", "https://open.feishu.cn/open-apis/im/v1/messages"),
-        "auth_endpoint": get("feishu.auth_endpoint", "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"),
+        "api_endpoint": get(
+            "feishu.api_endpoint", "https://open.feishu.cn/open-apis/im/v1/messages"
+        ),
+        "auth_endpoint": get(
+            "feishu.auth_endpoint",
+            "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+        ),
         "timeout": get("feishu.timeout", 30),
     }
 
@@ -201,8 +253,10 @@ Z120_PID_FILE = "/tmp/z120_monitor.pid"
 def get_python_cmd():
     """获取 Python 命令（支持虚拟环境和 Windows）"""
     import sys
+
     try:
         from config.env_config import get_python_path
+
         return get_python_path()
     except ImportError:
         # Windows 使用 "python"，Unix 使用 "python3"
@@ -248,19 +302,19 @@ def stop_z120_monitor():
     stopped = False
 
     try:
-        with open(Z120_PID_FILE) as f:
-            pid = int(f.read().strip())
-        os.kill(pid, 9)
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/F", "/IM", "python.exe"], capture_output=True)
+        else:
+            subprocess.run(["pkill", "-f", "z120_scheduler.py"], capture_output=True)
         stopped = True
     except:
         pass
 
     try:
-        result = subprocess.run(
-            ["pkill", "-f", "z120_scheduler.py"], capture_output=True
-        )
-        if result.returncode == 0:
-            stopped = True
+        with open(Z120_PID_FILE) as f:
+            pid = int(f.read().strip())
+        os.kill(pid, 9)
+        stopped = True
     except:
         pass
 
@@ -317,17 +371,17 @@ def get_monitor_status():
 def get_tenant_token():
     """获取 tenant_access_token"""
     global _token_cache
-    
+
     if _token_cache["token"] and time.time() < _token_cache["expire"]:
         return _token_cache["token"]
-    
+
     url = feishu_config.get(
         "auth_endpoint",
         "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
     )
     headers = {"Content-Type": "application/json; charset=utf-8"}
     payload = {"app_id": FEISHU_APP_ID, "app_secret": FEISHU_APP_SECRET}
-    
+
     try:
         resp = requests.post(url, headers=headers, json=payload, timeout=30)
         result = resp.json()
@@ -383,6 +437,7 @@ def send_feishu(text, receive_id=None):
             return (False, f"Status {resp.status_code}: {resp.text}")
     except Exception as e:
         import traceback
+
         _debug(f"[FEISHU] Exception: {e}")
         traceback.print_exc()
         return (False, str(e))
@@ -392,19 +447,30 @@ def execute_command(cmd):
     """执行命令并返回结果（Windows UTF-8 兼容）"""
     try:
         import sys
+
         # Windows 需要特殊处理编码
         if sys.platform == "win32":
             import subprocess
+
             result = subprocess.run(
                 cmd, shell=True, capture_output=True, timeout=30, cwd=get_project_root()
             )
             # 手动解码，避免 GBK 错误
-            stdout = result.stdout.decode('utf-8', errors='replace') if result.stdout else ""
-            stderr = result.stderr.decode('utf-8', errors='replace') if result.stderr else ""
+            stdout = (
+                result.stdout.decode("utf-8", errors="replace") if result.stdout else ""
+            )
+            stderr = (
+                result.stderr.decode("utf-8", errors="replace") if result.stderr else ""
+            )
             return stdout + stderr
         else:
             result = subprocess.run(
-                cmd, shell=True, capture_output=True, text=True, timeout=30, cwd=get_project_root()
+                cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                cwd=get_project_root(),
             )
             return result.stdout + result.stderr
     except Exception as e:
@@ -443,7 +509,11 @@ def get_positions_formatted():
             avg_cost = pos.avgCost
             if position == 0:
                 continue
-            pos_str = f"{position:+.0f}" if position != int(position) else f"{int(position):+}"
+            pos_str = (
+                f"{position:+.0f}"
+                if position != int(position)
+                else f"{int(position):+}"
+            )
             cost_str = f"{avg_cost:.2f}" if avg_cost else "N/A"
             lines.append(f"• {symbol} ({sec_type}): {pos_str} @ {cost_str}")
         if len(lines) == 1:
@@ -505,7 +575,9 @@ def get_orders_formatted():
             c = trade.contract
             order_info = {
                 "orderId": trade.order.orderId,
-                "symbol": c.localSymbol if hasattr(c, "localSymbol") and c.localSymbol else c.symbol,
+                "symbol": c.localSymbol
+                if hasattr(c, "localSymbol") and c.localSymbol
+                else c.symbol,
                 "action": trade.order.action,
                 "quantity": trade.order.totalQuantity,
                 "filled": os.filled,
@@ -513,7 +585,13 @@ def get_orders_formatted():
                 "avgFillPrice": os.avgFillPrice,
                 "status": os.status,
             }
-            if os.status in {"Submitted", "PendingSubmit", "PreSubmitted", "Active", "ApiPending"}:
+            if os.status in {
+                "Submitted",
+                "PendingSubmit",
+                "PreSubmitted",
+                "Active",
+                "ApiPending",
+            }:
                 pending.append(order_info)
             elif os.status in {"Filled", "ApiTraded"}:
                 filled.append(order_info)
@@ -525,11 +603,15 @@ def get_orders_formatted():
         if pending:
             lines.append(f"🔄 待成交 ({len(pending)} 单)")
             for o in pending:
-                lines.append(f"  • {o['symbol']}: {o['action']} {o['filled']:.0f}/{o['quantity']} ({o['status']})")
+                lines.append(
+                    f"  • {o['symbol']}: {o['action']} {o['filled']:.0f}/{o['quantity']} ({o['status']})"
+                )
         if filled:
             lines.append(f"\n✅ 已成交 ({len(filled)} 单)")
             for o in filled:
-                lines.append(f"  • {o['symbol']}: {o['action']} {o['filled']:.0f}/{o['quantity']} @ ${o['avgFillPrice']:.2f}")
+                lines.append(
+                    f"  • {o['symbol']}: {o['action']} {o['filled']:.0f}/{o['quantity']} @ ${o['avgFillPrice']:.2f}"
+                )
         if cancelled:
             lines.append(f"\n❌ 已取消 ({len(cancelled)} 单)")
             for o in cancelled:
@@ -537,7 +619,9 @@ def get_orders_formatted():
         if inactive:
             lines.append(f"\n⏸ 未激活 ({len(inactive)} 单)")
             for o in inactive:
-                lines.append(f"  • {o['symbol']}: {o['action']} {o['quantity']} ({o['status']})")
+                lines.append(
+                    f"  • {o['symbol']}: {o['action']} {o['quantity']} ({o['status']})"
+                )
         if len(lines) == 1:
             return "📋 当前无订单"
         return "\n".join(lines)
@@ -560,9 +644,15 @@ def get_fills_formatted():
             action = fill.execution.side
             qty = fill.execution.cumQty
             price = fill.execution.price
-            commission = fill.commissionReport.commission if fill.commissionReport else 0
-            exec_time = fill.execution.time.strftime("%H:%M:%S") if fill.execution.time else ""
-            lines.append(f"• {symbol}: {action} {qty} @ ${price:.2f} (手续费 ${commission:.2f}) {exec_time}")
+            commission = (
+                fill.commissionReport.commission if fill.commissionReport else 0
+            )
+            exec_time = (
+                fill.execution.time.strftime("%H:%M:%S") if fill.execution.time else ""
+            )
+            lines.append(
+                f"• {symbol}: {action} {qty} @ ${price:.2f} (手续费 ${commission:.2f}) {exec_time}"
+            )
         return "\n".join(lines)
     except Exception as e:
         return f"❌ 获取成交记录失败: {e}"
@@ -628,64 +718,72 @@ def run_multi_timeframe_analysis(symbol: str = "DOGE-USDT") -> str:
     try:
         sys.path.insert(0, PROJECT_ROOT)
         from quant_core.sources import create_datasource
-        
+
         _debug(f"[MTF] Starting analysis for {symbol}")
-        
+
         okx = create_datasource("okx")
-        
+
         timeframes = [
             ("1h", "1H", 50),
             ("4h", "4H", 50),
             ("1D", "1D", 30),
             ("1W", "1W", 20),
         ]
-        
+
         results = []
         for tf_name, tf_bar, tf_num in timeframes:
             try:
                 _debug(f"[MTF] Fetching {tf_name}...")
                 bars = okx.get_history(symbol, bar_size=tf_bar, num=tf_num)
-                
+
                 if not bars:
                     results.append(f"  {tf_name}: 无数据")
                     continue
-                
+
                 closes = [b.close for b in bars]
                 current_price = closes[-1]
-                
+
                 rsi = calculate_rsi(closes)
                 ma20 = calculate_ma(closes, 20) if len(closes) >= 20 else None
                 ma50 = calculate_ma(closes, 50) if len(closes) >= 50 else None
-                
+
                 if ma20 and current_price > ma20:
                     ma_signal = "BUY"
                 elif ma20 and current_price < ma20:
                     ma_signal = "SELL"
                 else:
                     ma_signal = "NEUTRAL"
-                
+
                 if rsi < 30:
                     osc_signal = "BUY"
                 elif rsi > 70:
                     osc_signal = "SELL"
                 else:
                     osc_signal = "NEUTRAL"
-                
-                results.append(f"  {tf_name}: RSI={rsi:.1f} MA={ma_signal} OSC={osc_signal}")
+
+                results.append(
+                    f"  {tf_name}: RSI={rsi:.1f} MA={ma_signal} OSC={osc_signal}"
+                )
             except Exception as e:
                 _debug(f"[MTF] Error {tf_name}: {e}")
                 results.append(f"  {tf_name}: 获取失败 - {str(e)[:30]}")
-        
+
         if not results:
             return f"无法获取 {symbol} 的数据，请检查品种代码"
-        
+
         buy_count = sum(1 for r in results if "BUY" in r)
         sell_count = sum(1 for r in results if "SELL" in r)
         total = len(timeframes)
         resonance = int((max(buy_count, sell_count) / total) * 100) if total > 0 else 0
-        
-        level = "强共振" if buy_count > sell_count and buy_count >= 3 else "强分歧" if sell_count > buy_count and sell_count >= 3 else "分歧"
-        
+
+        level = (
+            "强共振"
+            if buy_count > sell_count and buy_count >= 3
+            else "强分歧"
+            if sell_count > buy_count and sell_count >= 3
+            else "分歧"
+        )
+
         return f"""**{symbol} 多周期共振分析**
 
 {chr(10).join(results)}
@@ -700,17 +798,17 @@ def calculate_rsi(prices: list, period: int = 14) -> float:
     """计算 RSI"""
     if len(prices) < period + 1:
         return 50.0
-    
-    deltas = [prices[i] - prices[i-1] for i in range(1, len(prices))]
+
+    deltas = [prices[i] - prices[i - 1] for i in range(1, len(prices))]
     gains = [d if d > 0 else 0 for d in deltas]
     losses = [-d if d < 0 else 0 for d in deltas]
-    
+
     avg_gain = sum(gains[-period:]) / period
     avg_loss = sum(losses[-period:]) / period
-    
+
     if avg_loss == 0:
         return 100.0
-    
+
     rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
     return rsi
@@ -752,21 +850,30 @@ COMMANDS = {
 }
 
 
-def _submit_okx_order(symbol: str, action: str, quantity: int, usd_amount: float = None, 
-                       leverage: int = None, margin_mode: str = "cross", order_type: str = "market"):
+def _submit_okx_order(
+    symbol: str,
+    action: str,
+    quantity: float,
+    usd_amount: float = None,
+    leverage: int = None,
+    margin_mode: str = "cross",
+    order_type: str = "market",
+):
     okx_trader = None
     try:
         from okx_client.okx_trader import OKXTrader
+
         okx_trader = OKXTrader()
     except Exception as e:
         return {"error": f"OKX 客户端初始化失败: {e}"}
-    
+
     try:
         if usd_amount and leverage:
             quantity = okx_trader.calc_quantity_from_usd(symbol, usd_amount, leverage)
             okx_trader.set_leverage(symbol, str(leverage), margin_mode)
-        
+
         side = "buy" if action == "BUY" else "sell"
+        pos_side = "long" if action == "BUY" else "short"
         td_mode = "cross" if margin_mode == "cross" else "isolated"
         result = okx_trader.place_order(
             inst_id=symbol,
@@ -774,7 +881,7 @@ def _submit_okx_order(symbol: str, action: str, quantity: int, usd_amount: float
             sz=str(quantity),
             ord_type=order_type.lower(),
             tdMode=td_mode,
-            leverage=str(leverage) if leverage else None,
+            posSide=pos_side,
         )
         return result
     except Exception as e:
@@ -793,26 +900,24 @@ def tv_webhook():
 
         if symbol and action in ("BUY", "SELL", "CLOSE"):
             quantity = data.get("quantity", 1)
-            order_type = data.get("order_type", "MKT")
             sec_type = data.get("sec_type", "FUT")
             exchange = data.get("exchange", "").upper()
             usd_amount = data.get("usd_amount")
             leverage = data.get("leverage")
             margin_mode = data.get("margin_mode", "cross")
+            order_type = data.get(
+                "order_type", "market" if exchange == "OKX" else "MKT"
+            )
 
             if exchange == "OKX":
                 from datetime import datetime
+
                 time_str = datetime.now().strftime("%H:%M:%S")
                 action_cn = "买入" if action == "BUY" else "卖出"
                 leverage_info = f" {leverage}x杠杆" if leverage else ""
-                submit_msg = f"""⏳ **OKX 订单提交中**
-━━━━━━━━━━━━━━━━
-标的: {symbol}
-方向: {action_cn}{leverage_info}
-模式: {margin_mode}
-时间: {time_str}"""
+                submit_msg = f"⏳ OKX 订单提交中\n标的: {symbol}\n方向: {action_cn}{leverage_info}\n模式: {margin_mode}\n时间: {time_str}"
                 send_feishu(submit_msg)
-                
+
                 result = _submit_okx_order(
                     symbol=symbol,
                     action=action,
@@ -822,27 +927,27 @@ def tv_webhook():
                     margin_mode=margin_mode,
                     order_type=order_type,
                 )
-                
-                output_str = str(result)[:500] if result else ""
-                msg = f"""🤖 **OKX 交易信号**
-━━━━━━━━━━━━━━━━
-标的: {symbol}
-操作: {action}
-杠杆: {leverage}x
-保证金: {usd_amount} USD
-数量: {quantity}
 
-结果:
-{output_str}"""
+                output_str = str(result)[:500] if result else ""
+                msg = (
+                    f"🤖 OKX 交易信号\n标的: {symbol}\n操作: {action}\n杠杆: {leverage}x\n保证金: {usd_amount} USD\n数量: {quantity}\n\n结果: {output_str}"
+                    if leverage and usd_amount
+                    else f"🤖 OKX 交易信号\n标的: {symbol}\n操作: {action}\n数量: {quantity}\n\n结果: {output_str}"
+                )
                 send_feishu(msg)
                 return jsonify({"status": "ok", "order": result})
             else:
                 try:
                     from orders.exchange_mapper import get_exchange_for_symbol
-                    exchange = get_exchange_for_symbol(symbol, "FUT") if sec_type == "FUT" else ""
+
+                    exchange = (
+                        get_exchange_for_symbol(symbol, "FUT")
+                        if sec_type == "FUT"
+                        else ""
+                    )
                 except Exception:
                     exchange = ""
-                
+
                 try:
                     from client.ib_connection import get_ib_connection
                     from orders.place_order_func import place_order
@@ -852,8 +957,15 @@ def tv_webhook():
                         output = "IB 连接失败或已断开"
                     else:
                         from datetime import datetime
+
                         time_str = datetime.now().strftime("%H:%M:%S")
-                        action_cn = "买入" if action == "BUY" else "卖出" if action == "SELL" else "平仓"
+                        action_cn = (
+                            "买入"
+                            if action == "BUY"
+                            else "卖出"
+                            if action == "SELL"
+                            else "平仓"
+                        )
                         submit_msg = f"""⏳ **订单提交中**
 ━━━━━━━━━━━━━━━━
 标的: {symbol} ({exchange})
@@ -861,15 +973,21 @@ def tv_webhook():
 数量: {quantity} 手
 时间: {time_str}"""
                         _ = send_feishu(submit_msg)
-                        
+
                         future = _submit_order_in_background(
-                            ib, symbol, action, quantity,
+                            ib,
+                            symbol,
+                            action,
+                            quantity,
                             exchange=exchange,
                             sec_type=sec_type,
                             close_position=(action == "CLOSE"),
-                            outside_rth=True
+                            outside_rth=True,
                         )
-                        output = {"status": "Submitted", "message": f"后台已提交下单: {symbol} {action} {quantity}"}
+                        output = {
+                            "status": "Submitted",
+                            "message": f"后台已提交下单: {symbol} {action} {quantity}",
+                        }
                 except Exception as e:
                     output = f"错误: {e}"
 
@@ -877,7 +995,11 @@ def tv_webhook():
                 msg = f"🤖 Webhook 交易信号\n\n标的: {symbol}\n操作: {action}\n数量: {quantity}\n订单类型: {order_type}\n\n结果:\n{output_str}"
                 send_feishu(msg)
 
-                order_payload = output if isinstance(output, dict) else {"status": "Unknown", "order": str(output)}
+                order_payload = (
+                    output
+                    if isinstance(output, dict)
+                    else {"status": "Unknown", "order": str(output)}
+                )
                 return jsonify({"status": "ok", "order": order_payload})
         else:
             title = data.get("title", "Webhook 警报")
@@ -927,6 +1049,7 @@ def feishu_webhook():
             if msg_id:
                 cache_key = f"feishu_msg_{msg_id}"
                 import time
+
                 current_time = int(time.time())
                 if not hasattr(feishu_webhook, "_msg_cache"):
                     feishu_webhook._msg_cache = {}
@@ -936,7 +1059,7 @@ def feishu_webhook():
                         logger.info(f"[FEISHU] Duplicate message: {msg_id}, skip")
                         return jsonify({"status": "ok", "order": order_result}), 200
                 feishu_webhook._msg_cache[cache_key] = current_time
-            
+
             logger.info(f"[FEISHU] Message: {json.dumps(message, ensure_ascii=False)}")
 
             content_raw = message.get("content", "{}")
@@ -1009,46 +1132,58 @@ def feishu_webhook():
                     success, resp = send_feishu(f"**{cmd_key}**\n\n{output}", chat_id)
                 else:
                     parsed = parse_trading_command(text)
-                    action = parsed.get('action')
-                    symbol = parsed.get('symbol')
-                    quantity = parsed.get('quantity', 1)
-                    sec_type = parsed.get('sec_type')  # 外汇为 CASH, 黄金为 CFD
-                    parsed_exchange = parsed.get('exchange')  # 交易所
-                    cfd_symbol = parsed.get('cfd_symbol')  # CFD 实际符号
-                    cfd_conId = parsed.get('cfd_conId')  # CFD 合约ID
-                    
+                    action = parsed.get("action")
+                    symbol = parsed.get("symbol")
+                    quantity = parsed.get("quantity", 1)
+                    sec_type = parsed.get("sec_type")  # 外汇为 CASH, 黄金为 CFD
+                    parsed_exchange = parsed.get("exchange")  # 交易所
+                    cfd_symbol = parsed.get("cfd_symbol")  # CFD 实际符号
+                    cfd_conId = parsed.get("cfd_conId")  # CFD 合约ID
+
                     if quantity is None:
                         quantity = 1
-                    
-                    if action and action != 'UNKNOWN':
+
+                    if action and action != "UNKNOWN":
                         try:
-                            logger.info(f"[FEISHU] NL parsed: action={action}, symbol={symbol}, qty={quantity}, sec_type={sec_type}")
-                            
+                            logger.info(
+                                f"[FEISHU] NL parsed: action={action}, symbol={symbol}, qty={quantity}, sec_type={sec_type}"
+                            )
+
                             # 复用 IB 连接，直接调用 place_order_func.place_order
                             # 添加事件循环，避免 ib_insync 内部错误
                             import asyncio
                             import sys
                             import traceback as tb_module
-                            
+
                             # 应用 nest_asyncio 允许嵌套事件循环（修复 ib_insync 在子线程中的问题）
                             try:
                                 import nest_asyncio
+
                                 nest_asyncio.apply()
                             except ImportError:
                                 pass
-                            
+
                             from client.ib_connection import get_ib_connection
                             from orders.place_order_func import place_order
                             from orders.exchange_mapper import get_exchange_for_symbol
-                            
-                            _debug(f"[FEISHU] get_ib_connection() calling...", )
+
+                            _debug(
+                                f"[FEISHU] get_ib_connection() calling...",
+                            )
                             ib = get_ib_connection()
-                            _debug(f"[FEISHU] get_ib_connection() returned ib={ib}, connected={ib.isConnected() if ib else None}", )
-                            
+                            _debug(
+                                f"[FEISHU] get_ib_connection() returned ib={ib}, connected={ib.isConnected() if ib else None}",
+                            )
+
                             if ib is None or not ib.isConnected():
                                 error_msg = "IB 连接失败或已断开"
-                                _debug(f"[FEISHU] {error_msg}", )
-                                send_feishu(f"❌ 下单失败: {error_msg}\n请检查 IB Gateway", chat_id)
+                                _debug(
+                                    f"[FEISHU] {error_msg}",
+                                )
+                                send_feishu(
+                                    f"❌ 下单失败: {error_msg}\n请检查 IB Gateway",
+                                    chat_id,
+                                )
                             else:
                                 # 使用解析出的交易所，或根据品种类型推断
                                 if parsed_exchange:
@@ -1057,18 +1192,27 @@ def feishu_webhook():
                                     exchange = get_exchange_for_symbol(symbol, sec_type)
                                 else:
                                     exchange = get_exchange_for_symbol(symbol, "FUT")
-                                is_close = (action == "CLOSE")
-                                
+                                is_close = action == "CLOSE"
+
                                 # CFD 使用实际符号
                                 actual_symbol = cfd_symbol if cfd_symbol else symbol
                                 actual_conId = cfd_conId if cfd_conId else None
-                                
-                                _debug(f"[FEISHU] Calling place_order: symbol={actual_symbol}, action={action}, qty={quantity}, sec_type={sec_type}, exchange={exchange}, conId={actual_conId}, close_position={is_close}")
-                                
+
+                                _debug(
+                                    f"[FEISHU] Calling place_order: symbol={actual_symbol}, action={action}, qty={quantity}, sec_type={sec_type}, exchange={exchange}, conId={actual_conId}, close_position={is_close}"
+                                )
+
                                 # 先发送订单提交通知（立即）
                                 from datetime import datetime
+
                                 time_str = datetime.now().strftime("%H:%M:%S")
-                                action_cn = "买入" if action == "BUY" else "卖出" if action == "SELL" else "平仓"
+                                action_cn = (
+                                    "买入"
+                                    if action == "BUY"
+                                    else "卖出"
+                                    if action == "SELL"
+                                    else "平仓"
+                                )
                                 submit_msg = f"""⏳ **订单提交中**
 ━━━━━━━━━━━━━━━
 标的: {symbol} ({exchange})
@@ -1076,13 +1220,30 @@ def feishu_webhook():
 数量: {quantity} 手
 时间: {time_str}"""
                                 send_feishu(submit_msg, chat_id)
-                                
+
                                 # 后台提交订单
-                                future = _submit_order_in_background(ib, actual_symbol, action, quantity, exchange=exchange, sec_type=sec_type, conId=actual_conId, close_position=is_close)
-                                order_result = {"status": "Submitted", "symbol": symbol, "action": action, "quantity": quantity, "exchange": exchange}
+                                future = _submit_order_in_background(
+                                    ib,
+                                    actual_symbol,
+                                    action,
+                                    quantity,
+                                    exchange=exchange,
+                                    sec_type=sec_type,
+                                    conId=actual_conId,
+                                    close_position=is_close,
+                                )
+                                order_result = {
+                                    "status": "Submitted",
+                                    "symbol": symbol,
+                                    "action": action,
+                                    "quantity": quantity,
+                                    "exchange": exchange,
+                                }
                         except Exception as e:
                             err_str = tb_module.format_exc()
-                            _debug(f"[FEISHU] IB/connect EXCEPTION: {type(e).__name__}: {e}\n{err_str}", )
+                            _debug(
+                                f"[FEISHU] IB/connect EXCEPTION: {type(e).__name__}: {e}\n{err_str}",
+                            )
                             order_result = {"error": f"{type(e).__name__}: {e}"}
                     else:
                         send_feishu(get_help_text(), chat_id)
@@ -1108,18 +1269,21 @@ def get_positions_endpoint():
     """Get current positions"""
     try:
         from client.ib_connection import get_ib_manager
+
         manager = get_ib_manager()
         ib = manager.get_connection()
         positions = manager.run_sync(lambda: ib.positions(), timeout=10)
         result = []
         for p in positions:
-            result.append({
-                "symbol": p.contract.symbol,
-                "position": p.position,
-                "avgCost": p.avgCost,
-                "account": p.account,
-                "contract": str(p.contract),
-            })
+            result.append(
+                {
+                    "symbol": p.contract.symbol,
+                    "position": p.position,
+                    "avgCost": p.avgCost,
+                    "account": p.account,
+                    "contract": str(p.contract),
+                }
+            )
         return jsonify({"positions": result, "count": len(result)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1130,19 +1294,22 @@ def get_orders_endpoint():
     """Get open orders"""
     try:
         from client.ib_connection import get_ib_manager
+
         manager = get_ib_manager()
         ib = manager.get_connection()
         trades = manager.run_sync(lambda: ib.openTrades(), timeout=10)
         result = []
         for t in trades:
-            result.append({
-                "orderId": t.order.orderId,
-                "symbol": t.contract.symbol,
-                "action": t.order.action,
-                "quantity": t.order.totalQuantity,
-                "status": t.orderStatus.status,
-                "filled": t.orderStatus.filled,
-            })
+            result.append(
+                {
+                    "orderId": t.order.orderId,
+                    "symbol": t.contract.symbol,
+                    "action": t.order.action,
+                    "quantity": t.order.totalQuantity,
+                    "status": t.orderStatus.status,
+                    "filled": t.orderStatus.filled,
+                }
+            )
         return jsonify({"orders": result, "count": len(result)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1178,11 +1345,17 @@ def test_mtf():
 if __name__ == "__main__":
     # Fix Windows GBK encoding for emoji
     import sys
-    if sys.platform == 'win32':
+
+    if sys.platform == "win32":
         import io
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
-    
+
+        sys.stdout = io.TextIOWrapper(
+            sys.stdout.buffer, encoding="utf-8", errors="replace"
+        )
+        sys.stderr = io.TextIOWrapper(
+            sys.stderr.buffer, encoding="utf-8", errors="replace"
+        )
+
     port = int(sys.argv[1]) if len(sys.argv) > 1 else get_webhook_port()
 
     print("=" * 60)
@@ -1192,14 +1365,18 @@ if __name__ == "__main__":
 
     # 启动时预初始化 IB（后台线程，避免阻塞 Flask）
     import threading
+
     def _bg_connect():
         try:
             ib = get_ib_connection()
-            print(f"[IB] pre-connect result: connected={ib.isConnected() if ib else False}")
+            print(
+                f"[IB] pre-connect result: connected={ib.isConnected() if ib else False}"
+            )
             # 注册 execDetails 成交回调
             _register_fill_callback()
         except Exception as e:
             print(f"[IB] pre-connect failed: {e}")
+
     t = threading.Thread(target=_bg_connect, daemon=True)
     t.start()
     # 不等待，让 Flask 立即启动，IB 在后台连接
@@ -1208,14 +1385,14 @@ if __name__ == "__main__":
     print()
     print(f"Mode: {'Query Only' if QUERY_ONLY else 'Trading'}")
 
-    # 自动检查并启动 Z120 监控
-    z120_running = get_z120_status()
-    if z120_running.startswith("✅"):
-        print(f"📊 Z120 监控: 已运行")
-    else:
-        print("📊 Z120 监控: 自动启动...")
-        start_result = start_z120_monitor()
-        print(f"      {start_result}")
+    # 自动检查并启动 Z120 监控 - 已禁用，用户要求手动启动
+    # z120_running = get_z120_status()
+    # if z120_running.startswith("✅"):
+    #     print(f"📊 Z120 监控: 已运行")
+    # else:
+    #     print("📊 Z120 监控: 自动启动...")
+    #     start_result = start_z120_monitor()
+    #     print(f"      {start_result}")
 
     print()
     print("端点:")

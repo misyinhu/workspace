@@ -19,41 +19,43 @@ CMDTY_SYMBOLS = {
 TRADING_PATTERNS = [
     # 平仓 patterns (优先匹配)
     (r"平掉(\S+?)(?:仓|位)$", "CLOSE"),
-    (r"平仓(\d+)单元(\S+)$", "CLOSE"),  # 平仓1单元gc
-    (r"平仓(\d+)手(\S+)$", "CLOSE"),    # 平仓1手gc
-    (r"平仓(\S+)(\d+)单元$", "CLOSE"),  # 平仓GC1单元
-    (r"平仓(\S+)(\d+)手$", "CLOSE"),    # 平仓GC1手
+    (r"平仓(\d+)单元(\S+)$", "CLOSE"),
+    (r"平仓(\d+)手(\S+)$", "CLOSE"),
+    (r"平仓(\S+)(\d+)单元$", "CLOSE"),
+    (r"平仓(\S+)(\d+)手$", "CLOSE"),
     (r"平仓(\S+)$", "CLOSE"),
     (r"清仓$", "CLOSE"),
+    (r"(卖出|卖空|做空)(\d+)美元(\S+?)$", "SELL"),
+    (r"(买入|买|做多)(\d+)美元(\S+?)$", "BUY"),
     
     # 卖出/做空 patterns (支持"手"和"股")
-    (r"卖空(\d+)单元(\S+)$", "SELL"),  # 卖空1单元gc
-    (r"卖出(\d+)单元(\S+)$", "SELL"),  # 卖出1单元gc
-    (r"做空(\d+)单元(\S+)$", "SELL"),  # 做空1单元gc
-    (r"卖空(\S+)(\d+)单元$", "SELL"),  # 卖空GC1单元
-    (r"卖出(\S+)(\d+)单元$", "SELL"),  # 卖出GC1单元
-    (r"做空(\S+)(\d+)单元$", "SELL"),  # 做空GC1单元
-    (r"卖空(\S+)(\d+)手$", "SELL"),    # 卖空GC1手
-    (r"卖出(\S+)(\d+)手$", "SELL"),    # 卖出GC1手
-    (r"做空(\S+)(\d+)手$", "SELL"),    # 做空GC1手
+    (r"卖空(\d+)单元(\S+)$", "SELL"),
+    (r"卖出(\d+)单元(\S+)$", "SELL"),
+    (r"做空(\d+)单元(\S+)$", "SELL"),
+    (r"卖空(\S+)(\d+)单元$", "SELL"),
+    (r"卖出(\S+)(\d+)单元$", "SELL"),
+    (r"做空(\S+)(\d+)单元$", "SELL"),
+    (r"卖空(\S+)(\d+)手$", "SELL"),
+    (r"卖出(\S+)(\d+)手$", "SELL"),
+    (r"做空(\S+)(\d+)手$", "SELL"),
     (r"卖空(\d+)(?:手|股)(\S+)$", "SELL"),
     (r"做空(\d+)(?:手|股)(\S+)$", "SELL"),
     (r"卖出(\d+)(?:手|股)(\S+)$", "SELL"),
     (r"卖出(\S+)$", "SELL"),
     (r"做空(\S+)$", "SELL"),
-    (r"卖(\d+)$", "SELL"),  # 卖1 = 卖1手GC
+    (r"卖(\d+)$", "SELL"),
     
     # 买入 patterns (支持"手"和"股")
-    (r"买入(\d+)单元(\S+)$", "BUY"),  # 买入1单元gc
-    (r"做多(\d+)单元(\S+)$", "BUY"),   # 做多1单元gc
-    (r"买入(\S+)(\d+)单元$", "BUY"),  # 买入GC1单元
-    (r"做多(\S+)(\d+)单元$", "BUY"),   # 做多GC1单元
-    (r"买入(\S+)(\d+)手$", "BUY"),    # 买入GC1手
-    (r"做多(\S+)(\d+)手$", "BUY"),     # 做多GC1手
+    (r"买入(\d+)单元(\S+)$", "BUY"),
+    (r"做多(\d+)单元(\S+)$", "BUY"),
+    (r"买入(\S+)(\d+)单元$", "BUY"),
+    (r"做多(\S+)(\d+)单元$", "BUY"),
+    (r"买入(\S+)(\d+)手$", "BUY"),
+    (r"做多(\S+)(\d+)手$", "BUY"),
     (r"买入(\d+)(?:手|股)(\S+)$", "BUY"),
     (r"做多(\d+)(?:手|股)(\S+)$", "BUY"),
     (r"买(\d+)(?:手|股)(\S+)$", "BUY"),
-    (r"买入(\d+)$", "BUY"),  # 买入1 = 买1手GC
+    (r"买入(\d+)$", "BUY"),
     (r"买入(\S+)$", "BUY"),
     (r"做多(\S+)$", "BUY"),
     (r"购买(\d+)(?:手|股)(\S+)$", "BUY"),
@@ -71,59 +73,67 @@ QUERY_PATTERNS = [
 
 
 def parse_trading_command(message: str) -> Dict[str, Any]:
-    """解析交易命令 - 简单规则匹配"""
     msg = message.strip()
     msg_lower = msg.lower()
     
-    # 检查是否是查询指令
     for pattern in QUERY_PATTERNS:
         if re.search(pattern, msg_lower):
             return {"action": "QUERY", "raw": msg}
     
-    # 检查是否是交易指令
     for pattern, action in TRADING_PATTERNS:
         match = re.search(pattern, msg_lower)
         if match:
             result = {"action": action, "raw": msg}
-            
-            # 提取数量和 symbol
             groups = match.groups()
             quantity = None
             symbol = None
+            usd_amount = None
             
-            for g in groups:
-                if g and g.isdigit():
-                    quantity = int(g)
-                elif g and g.strip() and not g.strip().isdigit():
-                    symbol = g.strip()
+            if "美元" in pattern:
+                for g in groups:
+                    if g and g.isdigit():
+                        usd_amount = int(g)
+                    elif g and g.strip() and not g.strip().isdigit():
+                        symbol = g.strip()
+                if usd_amount:
+                    result["usd_amount"] = usd_amount
+            else:
+                for g in groups:
+                    if g and g.isdigit():
+                        quantity = int(g)
+                    elif g and g.strip() and not g.strip().isdigit():
+                        symbol = g.strip()
+                if quantity is not None:
+                    result["quantity"] = quantity
             
-            if quantity is not None:
-                result["quantity"] = quantity
             if symbol:
-                # 清理 symbol - 移除 "单元"、"手"、"股" 等后缀
                 symbol = symbol.upper().strip()
                 symbol = re.sub(r"(单元|手|股)$", "", symbol)
                 symbol = symbol.strip()
                 
-                symbol_map = {
-                    "BTC": "BTC", "比特币": "BTC",
-                    "黄金": "GC", "黄金": "GC",
-                    "小纳指": "MNQ", "纳指": "NQ",
-                    "标普": "ES", "道指": "YM",
-                }
-                for k, v in symbol_map.items():
-                    if k in symbol:
-                        symbol = v
-                        break
-                result["symbol"] = symbol
+                if "-SWAP" not in symbol and any(k in symbol for k in ["DOGE", "ETH", "BTC"]):
+                    symbol = symbol + "-USDT-SWAP"
+                    result["exchange"] = "OKX"
+                    result["sec_type"] = "SWAP"
+                else:
+                    symbol_map = {
+                        "BTC": "BTC", "比特币": "BTC",
+                        "黄金": "GC", "黄金": "GC",
+                        "小纳指": "MNQ", "纳指": "NQ",
+                        "标普": "ES", "道指": "YM",
+                    }
+                    for k, v in symbol_map.items():
+                        if k in symbol:
+                            symbol = v
+                            break
+                    if symbol in CMDTY_SYMBOLS:
+                        result["sec_type"] = "CMDTY"
+                        result["exchange"] = "SMART"
+                    elif symbol in FOREX_SYMBOLS:
+                        result["sec_type"] = "CASH"
+                        result["exchange"] = "IDEALPRO"
                 
-                # 检测品种类型
-                if symbol in CMDTY_SYMBOLS:
-                    result["sec_type"] = "CMDTY"
-                    result["exchange"] = "SMART"
-                elif symbol in FOREX_SYMBOLS:
-                    result["sec_type"] = "CASH"
-                    result["exchange"] = "IDEALPRO"
+                result["symbol"] = symbol
             
             return result
     

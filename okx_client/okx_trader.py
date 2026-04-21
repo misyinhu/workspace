@@ -13,7 +13,7 @@ from okx import Account, Trade, MarketData
 def _load_config():
     for p in [Path(__file__).parent / "config.yaml", Path(__file__).parent.parent / "config" / "okx.yaml"]:
         if p.exists():
-            with open(p) as f:
+            with open(p, encoding="utf-8") as f:
                 return yaml.safe_load(f)
     return {}
 
@@ -117,7 +117,7 @@ class OKXTrader:
         sz: str,
         ord_type: str = "market",
         tdMode: str = "cash",
-        leverage: str = None,
+        posSide: str = None,
     ):
         params = {
             "instId": inst_id,
@@ -126,20 +126,24 @@ class OKXTrader:
             "ordType": ord_type,
             "sz": sz,
         }
-        if leverage:
-            params["leverage"] = leverage
+        if posSide:
+            params["posSide"] = posSide
         return self.trade.place_order(**params)
 
-    def calc_quantity_from_usd(self, inst_id: str, usd_amount: float, leverage: int = 1) -> int:
+    def calc_quantity_from_usd(self, inst_id: str, usd_amount: float, leverage: int = 1) -> float:
         ticker = self.get_ticker(inst_id)
         if ticker.get("code") != "0" or not ticker.get("data"):
             raise ValueError(f"获取 {inst_id} 价格失败: {ticker}")
         last_price = float(ticker["data"][0]["last"])
         position_value = usd_amount * leverage
-        quantity = int(position_value / last_price)
-        if quantity < 1:
-            quantity = 1
-        return quantity
+        doge_qty = position_value / last_price
+        contract_size = 1000
+        contracts = doge_qty / contract_size
+        lot_size = 0.01
+        contracts = round(contracts / lot_size) * lot_size
+        if contracts < lot_size:
+            contracts = lot_size
+        return contracts
 
     def cancel_order(self, inst_id: str, ord_id: str):
         return self.trade.cancel_order(instId=inst_id, ordId=ord_id)
