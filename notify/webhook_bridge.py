@@ -1002,12 +1002,20 @@ def tv_webhook():
                 )
                 return jsonify({"status": "ok", "order": order_payload})
         else:
+            # 打印收到的原始数据用于调试
+            print(f"[TV-WEBHOOK] 收到数据: {json.dumps(data, ensure_ascii=False)[:500]}")
+            
             title = data.get("title", "Webhook 警报")
             description = data.get("description", "")
+            # 也检查其他常见字段
+            ticker = data.get("ticker", "")
+            reason = data.get("reason", "")
+            message = data.get("message", "")
             
             # 过滤掉 Z120 "无法获取当前价差" 警报（这类警报由 TradingView 频繁推送，无需转发到飞书）
-            if "无法获取当前价差" in title or "无法获取当前价差" in description:
-                print(f"[TV-WEBHOOK] 过滤掉 Z120 警报: {title}")
+            filter_text = "无法获取当前价差"
+            if filter_text in (title + description + ticker + reason + message):
+                print(f"[TV-WEBHOOK] 过滤掉 Z120 警报: title={title}, ticker={ticker}, reason={reason}")
                 return jsonify({"status": "ok", "filtered": True})
             
             success, result = send_feishu(f"{title}\n\n{description}")
