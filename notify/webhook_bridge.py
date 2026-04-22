@@ -1158,21 +1158,33 @@ def feishu_webhook():
                         quantity = 1
 
                     if action and action != "UNKNOWN":
-                        # ===== 订单级去重（30秒内相同订单不重复执行）=====
-                        import time as _time
-                        _action_cn = {"BUY": "买入", "SELL": "卖出", "CLOSE": "平仓"}.get(action, action)
-                        _order_key = f"{action}|{symbol}|{quantity}|{sec_type or ''}|{parsed_exchange or ''}"
-                        _now = int(_time.time())
-                        if not hasattr(feishu_webhook, "_order_cache"):
-                            feishu_webhook._order_cache = {}
-                        if _order_key in feishu_webhook._order_cache:
-                            if _now - feishu_webhook._order_cache[_order_key] < 30:
-                                _dup_msg = "\u26a0\ufeff **重复订单已拦截**（30秒内相同订单）\n标的: " + symbol + " | 方向: " + _action_cn + " | 数量: " + str(quantity)
-                                logger.info("[FEISHU] Duplicate order: " + _order_key + ", skip")
-                                send_feishu(_dup_msg, chat_id)
-                                return jsonify({"status": "ok", "order": order_result or {}}), 200
-                        feishu_webhook._order_cache[_order_key] = _now
+                        # ===== 订单级去重（60秒内相同订单，文件缓存支持多worker）=====
+                        import time as _time, threading as _threading, json as _json
+                        _DLOCK = _threading.Lock()
+                        _DFILE = os.path.join(PROJECT_ROOT, ".order_dedup_cache.json")
+                        _ACN = {"BUY": "买入", "SELL": "卖出", "CLOSE": "平仓"}.get(action, action)
+                        _OK = f"{action}|{symbol}|{quantity}|{sec_type or ''}|{parsed_exchange or ''}"
+                        _NOW = int(_time.time())
+                        _ISDUP = False
+                        with _DLOCK:
+                            try:
+                                _C = _json.load(open(_DFILE, encoding="utf-8")) if os.path.exists(_DFILE) else {}
+                            except Exception:_C={}
+                            _C = {k:v for k,v in _C.items() if _NOW-v<120}
+                            if _OK in _C and _NOW-_C[_OK] < 60:
+                                _ISDUP = True
+                            else:
+                                _C[_OK] = _NOW
+                                try:_json.dump(_C, open(_DFILE,"w",encoding="utf-8"))
+                                except:pass
+                        if _ISDUP:
+                            _MSG = "\u26a0\ufe0f **重复订单已拦截**（60秒内相同订单）\n标的: " + symbol + " | 方向: " + _ACN + " | 数量: " + str(quantity)
+                            logger.info("[FEISHU] Duplicate: " + _OK + ", skip")
+                            send_feishu(_MSG, chat_id)
+                            return jsonify({"status": "ok", "order": order_result or {}}), 200
                         # ================================================
+                        
+
 
                         try:
                             logger.info(
