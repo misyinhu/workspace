@@ -218,15 +218,22 @@ def _place_order_impl(
             if pos_sec_type == "CRYPTO":
                 pos_contract = Crypto(symbol, exchange=pos_exchange, currency=pos_currency or "USD")
             elif con_id and con_id > 0:
-                # 使用 conId 构建合约（最可靠）
-                pos_contract = Contract(conId=con_id, exchange=pos_exchange)
+                # 使用 conId 构建合约（最可靠），同时保留 secType 避免 IB 识别为 STOCK 导致 Error 200
+                # CFD exchange must be SMART, not whatever was inherited from pos_contract
+                if pos_sec_type == 'CFD':
+                    pos_exchange = 'SMART'
+                pos_contract = Contract(conId=con_id, secType=pos_sec_type, exchange=pos_exchange)
             elif local_sym:
                 pos_contract = Contract(localSymbol=local_sym, exchange=pos_exchange,
                                        secType="FUT", currency=getattr(pos_contract, "currency", currency))
             if pos_contract.secType == "STK" and pos_contract.exchange in ("ARCA", "NYSE", "NASDAQ"):
                 pos_contract = Stock(symbol, exchange="SMART", currency=getattr(pos_contract, "currency", currency))
 
-            close_order = MarketOrder(action=pos_action, totalQuantity=float(pos_qty))
+            # User-specified quantity (from nl_parser) takes priority; cap at position size
+            effective_qty = float(pos_qty)
+            if quantity > 0 and quantity < effective_qty:
+                effective_qty = float(quantity)  # 尊重用户指定数量，不超过持仓
+            close_order = MarketOrder(action=pos_action, totalQuantity=effective_qty)
             close_order.tif = tif
             close_order.outsideRth = outside_rth
 

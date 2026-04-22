@@ -17,44 +17,39 @@ CMDTY_SYMBOLS = {
 }
 
 TRADING_PATTERNS = [
-    # 平仓 patterns (优先匹配)
+    # ===== 平仓 CLOSE ===== (具体 pattern 在前，通用在后)
     (r"平掉(\S+?)(?:仓|位)$", "CLOSE"),
+    (r"平仓(\d+)(?:手|股)(\S+)$", "CLOSE"),          # 平仓2手GC
+    (r"平仓([一二三四五六七八九十]+)(?:手|股)(\S+)$", "CLOSE"),  # 平仓一手GC
+    (r"平(\d+)(?:手|股)(\S+)$", "CLOSE"),             # 平2手GC
+    (r"平([一二三四五六七八九十]+)(?:手|股)(\S+)$", "CLOSE"),    # 平一手GC
     (r"平仓(\d+)单元(\S+)$", "CLOSE"),
     (r"平仓(\d+)手(\S+)$", "CLOSE"),
     (r"平仓(\S+)(\d+)单元$", "CLOSE"),
     (r"平仓(\S+)(\d+)手$", "CLOSE"),
-    (r"平仓(\S+)$", "CLOSE"),
     (r"清仓$", "CLOSE"),
-    (r"(卖出|卖空|做空)(\d+)美元(\S+?)$", "SELL"),
-    (r"(买入|买|做多)(\d+)美元(\S+?)$", "BUY"),
-    
-    # 卖出/做空 patterns (支持"手"和"股")
-    (r"卖空(\d+)单元(\S+)$", "SELL"),
-    (r"卖出(\d+)单元(\S+)$", "SELL"),
-    (r"做空(\d+)单元(\S+)$", "SELL"),
-    (r"卖空(\S+)(\d+)单元$", "SELL"),
-    (r"卖出(\S+)(\d+)单元$", "SELL"),
-    (r"做空(\S+)(\d+)单元$", "SELL"),
-    (r"卖空(\S+)(\d+)手$", "SELL"),
-    (r"卖出(\S+)(\d+)手$", "SELL"),
-    (r"做空(\S+)(\d+)手$", "SELL"),
+    (r"平仓(\S+)$", "CLOSE"),                          # 平仓GC (全平)
+    (r"平(\S+)$", "CLOSE"),
+    # ===== 卖出 SELL =====
     (r"卖空(\d+)(?:手|股)(\S+)$", "SELL"),
     (r"做空(\d+)(?:手|股)(\S+)$", "SELL"),
     (r"卖出(\d+)(?:手|股)(\S+)$", "SELL"),
     (r"卖出(\S+)$", "SELL"),
     (r"做空(\S+)$", "SELL"),
     (r"卖(\d+)$", "SELL"),
-    
-    # 买入 patterns (支持"手"和"股")
+    # ===== 买入 BUY ===== (具体在前，通用在后)
+    (r"买入(\d+)(?:手|股)(\S+)$", "BUY"),             # 买入1手GC
+    (r"买入([一二三四五六七八九十]+)(?:手|股)(\S+)$", "BUY"),  # 买入一手GC
+    (r"做多(\d+)(?:手|股)(\S+)$", "BUY"),
+    (r"做多([一二三四五六七八九十]+)(?:手|股)(\S+)$", "BUY"),
+    (r"买(\d+)(?:手|股)(\S+)$", "BUY"),
+    (r"买([一二三四五六七八九十]+)(?:手|股)(\S+)$", "BUY"),    # 买一手GC
     (r"买入(\d+)单元(\S+)$", "BUY"),
     (r"做多(\d+)单元(\S+)$", "BUY"),
     (r"买入(\S+)(\d+)单元$", "BUY"),
     (r"做多(\S+)(\d+)单元$", "BUY"),
     (r"买入(\S+)(\d+)手$", "BUY"),
     (r"做多(\S+)(\d+)手$", "BUY"),
-    (r"买入(\d+)(?:手|股)(\S+)$", "BUY"),
-    (r"做多(\d+)(?:手|股)(\S+)$", "BUY"),
-    (r"买(\d+)(?:手|股)(\S+)$", "BUY"),
     (r"买入(\d+)$", "BUY"),
     (r"买入(\S+)$", "BUY"),
     (r"做多(\S+)$", "BUY"),
@@ -98,11 +93,27 @@ def parse_trading_command(message: str) -> Dict[str, Any]:
                 if usd_amount:
                     result["usd_amount"] = usd_amount
             else:
+                cn_num_map = {"一":1,"二":2,"三":3,"四":4,"五":5,"六":6,"七":7,"八":8,"九":9,"十":10,"零":0, "百":100}
                 for g in groups:
-                    if g and g.isdigit():
-                        quantity = int(g)
-                    elif g and g.strip() and not g.strip().isdigit():
-                        symbol = g.strip()
+                    if g:
+                        g_stripped = g.strip()
+                        # 数字字符串 (Arabic)
+                        if g_stripped.isdigit():
+                            quantity = int(g_stripped)
+                        # 中文数字字符串
+                        elif any(cn in g_stripped for cn in cn_num_map):
+                            # 取第一个匹配的中文数字 (只支持个位+十)
+                            for cn, num in cn_num_map.items():
+                                if cn in g_stripped:
+                                    quantity = num
+                                    break
+                        # 普通字符串（不是数字）-> symbol
+                        elif g_stripped and not any(c.isdigit() for c in g_stripped) and len(g_stripped) > 1:
+                            symbol = g_stripped
+                        elif g_stripped and not any(cn in g_stripped for cn in cn_num_map):
+                            # single char like "一" or "G" - only assign to symbol if it's clearly not a number
+                            if g_stripped not in cn_num_map:
+                                symbol = g_stripped
                 if quantity is not None:
                     result["quantity"] = quantity
             
