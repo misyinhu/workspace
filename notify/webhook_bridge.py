@@ -1158,6 +1158,22 @@ def feishu_webhook():
                         quantity = 1
 
                     if action and action != "UNKNOWN":
+                        # ===== 订单级去重（30秒内相同订单不重复执行）=====
+                        import time as _time
+                        _action_cn = {"BUY": "买入", "SELL": "卖出", "CLOSE": "平仓"}.get(action, action)
+                        _order_key = f"{action}|{symbol}|{quantity}|{sec_type or ''}|{parsed_exchange or ''}"
+                        _now = int(_time.time())
+                        if not hasattr(feishu_webhook, "_order_cache"):
+                            feishu_webhook._order_cache = {}
+                        if _order_key in feishu_webhook._order_cache:
+                            if _now - feishu_webhook._order_cache[_order_key] < 30:
+                                _dup_msg = "\u26a0\ufeff **重复订单已拦截**（30秒内相同订单）\n标的: " + symbol + " | 方向: " + _action_cn + " | 数量: " + str(quantity)
+                                logger.info("[FEISHU] Duplicate order: " + _order_key + ", skip")
+                                send_feishu(_dup_msg, chat_id)
+                                return jsonify({"status": "ok", "order": order_result or {}}), 200
+                        feishu_webhook._order_cache[_order_key] = _now
+                        # ================================================
+
                         try:
                             logger.info(
                                 f"[FEISHU] NL parsed: action={action}, symbol={symbol}, qty={quantity}, sec_type={sec_type}"
