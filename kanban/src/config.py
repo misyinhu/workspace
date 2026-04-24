@@ -2,8 +2,27 @@
 
 import os
 import yaml
+from pathlib import Path
 
-_SHARED_CONFIG_PATH = "/Users/wang/.opencode/workspace/trading/config/settings.yaml"
+
+def _get_config_path() -> str:
+    """Try multiple config paths in order: local Mac, CXClaw Windows, relative."""
+    candidates = [
+        Path(__file__).parent.parent.parent
+        / "config"
+        / "settings.yaml",  # relative from kanban/src/
+        Path("D:/projects/trading/config/settings.yaml"),  # CXClaw Windows
+        Path(
+            "/Users/wang/.opencode/workspace/trading/config/settings.yaml"
+        ),  # Local Mac
+    ]
+    for p in candidates:
+        if p.exists():
+            return str(p)
+    return str(candidates[0])  # fallback to relative path
+
+
+_SHARED_CONFIG_PATH = _get_config_path()
 
 TIMEFRAMES = ["1m", "5m", "30m", "4h", "1D"]
 TIMEFRAME_LABELS = {
