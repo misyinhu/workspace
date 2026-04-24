@@ -5,9 +5,19 @@ import yaml
 from pathlib import Path
 
 
-_SHARED_CONFIG_PATH = str(
-    Path(__file__).parent.parent.parent / "config" / "settings.yaml"
-)
+def _get_config_path() -> str:
+    candidates = [
+        Path(__file__).parent.parent.parent / "config" / "settings.yaml",
+        Path("D:/projects/trading/config/settings.yaml"),
+        Path("/Users/wang/.opencode/workspace/trading/config/settings.yaml"),
+    ]
+    for p in candidates:
+        if p.exists():
+            return str(p)
+    return str(candidates[0])
+
+
+_SHARED_CONFIG_PATH = _get_config_path()
 
 TIMEFRAMES = ["1m", "5m", "30m", "4h", "1D"]
 TIMEFRAME_LABELS = {
