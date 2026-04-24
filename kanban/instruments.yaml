@@ -1,0 +1,56 @@
+# 常用品种配置
+# 支持的数据源: okx, ib, tdxquant, tradingview
+
+instruments:
+  # 加密货币 (OKX)
+  - symbol: "DOGE-USDT"
+    name: "DOGE永续"
+    exchange: "OKX"
+    source: "okx"
+  
+  - symbol: "ETH-USDT"
+    name: "ETH永续"
+    exchange: "OKX"
+    source: "okx"
+  
+  - symbol: "BTC-USDT"
+    name: "BTC永续"
+    exchange: "OKX"
+    source: "okx"
+  
+  # 美股 (IB)
+  - symbol: "AAPL"
+    name: "Apple"
+    exchange: "NASDAQ"
+    source: "ib"
+  
+  - symbol: "TSLA"
+    name: "Tesla"
+    exchange: "NASDAQ"
+    source: "ib"
+  
+  # 期货 (IB)
+  - symbol: "ES"
+    name: "E-mini S&P 500"
+    exchange: "CME"
+    source: "ib"
+  
+  - symbol: "MNQ"
+    name: "E-mini Nasdaq 100"
+    exchange: "CME"
+    source: "ib"
+  
+  - symbol: "GC"
+    name: "Gold"
+    exchange: "COMEX"
+    source: "ib"
+  
+  - symbol: "MGC"
+    name: "Micro Gold"
+    exchange: "COMEX"
+    source: "ib"
+    
+  - symbol: "MHG"
+    name: "Micro Gold Continuous"
+    exchange: "COMEX"
+    source: "ib"
