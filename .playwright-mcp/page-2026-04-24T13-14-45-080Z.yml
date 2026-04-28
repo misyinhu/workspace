@@ -1,0 +1,171 @@
+- generic [ref=e2]:
+  - generic [ref=e7]:
+    - button "keyboard_double_arrow_left" [ref=e434] [cursor=pointer]:
+      - generic [ref=e436]: keyboard_double_arrow_left
+    - list [ref=e10]:
+      - listitem [ref=e11]:
+        - link "app" [ref=e13] [cursor=pointer]:
+          - /url: http://localhost:8501/
+          - generic [ref=e14]: app
+      - listitem [ref=e15]:
+        - link "resonance" [ref=e17] [cursor=pointer]:
+          - /url: http://localhost:8501/resonance
+          - generic [ref=e18]: resonance
+      - listitem [ref=e19]:
+        - link "news center" [ref=e21] [cursor=pointer]:
+          - /url: http://localhost:8501/news_center
+          - generic [ref=e22]: news center
+      - listitem [ref=e23]:
+        - link "alerts" [ref=e25] [cursor=pointer]:
+          - /url: http://localhost:8501/alerts
+          - generic [ref=e26]: alerts
+    - generic [ref=e30]:
+      - heading "🔍 品种选择" [level=1] [ref=e34]
+      - heading "常用品种" [level=3] [ref=e38]
+      - generic [ref=e40]:
+        - paragraph [ref=e44]: 选择品种
+        - generic [ref=e46]:
+          - generic [ref=e47]:
+            - generic [ref=e48]: DOGE-USDT-SWAP - DOGE永续
+            - combobox "Selected DOGE-USDT-SWAP - DOGE永续. 选择品种" [ref=e50]
+          - img "open" [ref=e52]
+      - heading "或输入品种" [level=3] [ref=e57]
+      - generic [ref=e59]:
+        - paragraph [ref=e63]: 输入品种代码
+        - textbox "输入品种代码" [active] [ref=e66]:
+          - /placeholder: "如: TSLA, AAPL, DOGEUSDT..."
+          - text: AAPL
+      - separator [ref=e71]
+      - alert [ref=e439]:
+        - generic [ref=e443]:
+          - paragraph [ref=e444]:
+            - strong [ref=e445]: 自定义品种
+            - text: ": AAPL"
+          - paragraph [ref=e446]:
+            - strong [ref=e447]: 数据源
+            - text: ": TradingView"
+      - separator [ref=e448]
+      - heading "🔗 跨品种套利" [level=3] [ref=e451]
+      - generic [ref=e107] [cursor=pointer]:
+        - checkbox "启用双品种模式"
+        - paragraph [ref=e113]: 启用双品种模式
+      - separator [ref=e100]
+      - heading "⚙️ 设置" [level=3] [ref=e452]
+      - generic [ref=e125] [cursor=pointer]:
+        - checkbox "自动刷新"
+        - paragraph [ref=e131]: 自动刷新
+      - separator [ref=e118]
+      - heading "⚙️ 设置" [level=3] [ref=e122]
+  - generic [ref=e3]:
+    - banner [ref=e134]:
+      - generic [ref=e137]:
+        - generic [ref=e454]:
+          - img "Running..." [ref=e455]:
+            - img [ref=e456]
+          - button "Stop" [ref=e460] [cursor=pointer]
+        - button "Deploy" [ref=e139] [cursor=pointer]:
+          - generic [ref=e141]: Deploy
+        - button [ref=e143] [cursor=pointer]:
+          - img [ref=e144]
+    - generic [ref=e147]:
+      - heading "📈 多周期共振分析" [level=3] [ref=e152]:
+        - text: 📈 多周期共振分析
+        - generic [ref=e153]:
+          - link "Link to heading":
+            - /url: "#9b42f304"
+            - img
+      - separator [ref=e158]
+      - paragraph [ref=e468]: 加载数据中...
+      - heading "📊 各周期趋势" [level=3] [ref=e164]:
+        - text: 📊 各周期趋势
+        - generic [ref=e165]:
+          - link "Link to heading":
+            - /url: "#fbcccc50"
+            - img
+      - generic [ref=e167]:
+        - generic [ref=e171]:
+          - paragraph [ref=e176]:
+            - strong [ref=e177]: 1分钟 ➡️
+          - generic [ref=e180]:
+            - paragraph [ref=e184]: 价格
+            - paragraph [ref=e188]: "0.0984"
+          - paragraph [ref=e193]: "RSI: 73.5"
+        - generic [ref=e197]:
+          - paragraph [ref=e202]:
+            - strong [ref=e203]: 5分钟 ➡️
+          - generic [ref=e206]:
+            - paragraph [ref=e210]: 价格
+            - paragraph [ref=e214]: "0.0984"
+          - paragraph [ref=e219]: "RSI: 55.1"
+        - generic [ref=e223]:
+          - paragraph [ref=e228]:
+            - strong [ref=e229]: 30分钟 ➡️
+          - generic [ref=e232]:
+            - paragraph [ref=e236]: 价格
+            - paragraph [ref=e240]: "0.0984"
+          - paragraph [ref=e245]: "RSI: 60.2"
+        - generic [ref=e249]:
+          - paragraph [ref=e254]:
+            - strong [ref=e255]: 4小时 📈
+          - generic [ref=e258]:
+            - paragraph [ref=e262]: 价格
+            - paragraph [ref=e266]: "0.0984"
+          - paragraph [ref=e271]: "RSI: 55.2"
+        - generic [ref=e275]:
+          - paragraph [ref=e280]:
+            - strong [ref=e281]: 日线 📈
+          - generic [ref=e284]:
+            - paragraph [ref=e288]: 价格
+            - paragraph [ref=e292]: "0.0984"
+          - paragraph [ref=e297]: "RSI: 59.5"
+      - separator [ref=e302]
+      - generic [ref=e304]:
+        - alert [ref=e309]:
+          - paragraph [ref=e314]: ✅ 各周期趋势一致，无明显矛盾
+        - generic [ref=e318]:
+          - heading "💡 交易建议 ➡️" [level=3] [ref=e324]:
+            - text: 💡 交易建议 ➡️
+            - generic [ref=e325]:
+              - link "Link to heading":
+                - /url: "#f88af98e"
+                - img
+          - generic [ref=e327]:
+            - generic [ref=e329]:
+              - paragraph [ref=e334]:
+                - strong [ref=e335]: 建议方向
+                - text: ":"
+                - code [ref=e336]: 观望
+              - paragraph [ref=e341]:
+                - strong [ref=e342]: 置信度
+                - text: ": 低"
+            - paragraph [ref=e349]:
+              - strong [ref=e350]: 原因
+              - text: ": 共振较弱，建议观望"
+      - separator [ref=e355]
+      - heading "🎯 共振分数" [level=3] [ref=e361]:
+        - text: 🎯 共振分数
+        - generic [ref=e362]:
+          - link "Link to heading":
+            - /url: "#44292e3f"
+            - img
+      - generic [ref=e364]:
+        - generic [ref=e368]:
+          - paragraph [ref=e371]: 40 分 (低共振)
+          - progressbar "40% Loaded" [ref=e372]
+        - paragraph [ref=e382]: "📈 上涨: 2 📉 下跌: 0 ➡️ 震荡: 3"
+      - separator [ref=e387]
+      - heading "📋 多周期汇总" [level=3] [ref=e393]:
+        - text: 📋 多周期汇总
+        - generic [ref=e394]:
+          - link "Link to heading":
+            - /url: "#838a4081"
+            - img
+      - generic [ref=e399]:
+        - button "Show/hide columns" [ref=e403] [cursor=pointer]:
+          - img [ref=e404]
+        - button "Download as CSV" [ref=e409] [cursor=pointer]:
+          - img [ref=e410]
+        - button "Search" [ref=e415] [cursor=pointer]:
+          - img [ref=e416]
+        - button "Fullscreen" [ref=e421] [cursor=pointer]:
+          - img [ref=e422]

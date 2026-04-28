@@ -1,0 +1,14 @@
+[server]
+headless = true
+
+[theme]
+base = "dark"
+
+[client]
+showSidebarNavigation = true
+
+[browser]
+gatherUsageStats = false
+
+[runner]
+magicEnabled = true

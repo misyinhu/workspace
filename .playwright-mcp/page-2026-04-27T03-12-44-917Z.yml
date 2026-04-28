@@ -1,0 +1,178 @@
+- generic [ref=e2]:
+  - generic [ref=e7]:
+    - button "keyboard_double_arrow_left" [ref=e190] [cursor=pointer]:
+      - generic [ref=e192]: keyboard_double_arrow_left
+    - generic [ref=e11]:
+      - generic [ref=e16]:
+        - generic [ref=e17]: 📊
+        - generic [ref=e18]:
+          - generic [ref=e19]: Quant Research
+          - generic [ref=e20]: 价差分析平台
+      - radiogroup "导航" [ref=e23] [cursor=pointer]:
+        - generic [ref=e24]:
+          - radio "📋 概览仪表盘"
+          - paragraph [ref=e29]: 📋 概览仪表盘
+        - generic [ref=e30]:
+          - radio "🧭 智能配对中心"
+          - paragraph [ref=e35]: 🧭 智能配对中心
+        - generic [ref=e36]:
+          - radio "📈 价差分析看板"
+          - paragraph [ref=e41]: 📈 价差分析看板
+        - generic [ref=e42]:
+          - radio "🎯 期权分析看板" [checked] [active]
+          - paragraph [ref=e47]: 🎯 期权分析看板
+        - generic [ref=e48]:
+          - radio "📊 交易分析中心"
+          - paragraph [ref=e53]: 📊 交易分析中心
+        - generic [ref=e54]:
+          - radio "📓 净值统计中心"
+          - paragraph [ref=e59]: 📓 净值统计中心
+  - generic [ref=e3]:
+    - banner [ref=e62]:
+      - generic [ref=e65]:
+        - button "Deploy" [ref=e67] [cursor=pointer]:
+          - generic [ref=e69]: Deploy
+        - button [ref=e71] [cursor=pointer]:
+          - img [ref=e72]
+    - generic [ref=e75]:
+      - button "☰ 收起" [ref=e81] [cursor=pointer]:
+        - paragraph [ref=e85]: ☰ 收起
+      - heading "🎯 期权分析看板" [level=2] [ref=e194]:
+        - text: 🎯 期权分析看板
+        - generic [ref=e195]:
+          - link "Link to heading":
+            - /url: "#a83e7931"
+            - img
+      - generic [ref=e197]:
+        - paragraph [ref=e201]: 分析模式
+        - radiogroup "分析模式" [ref=e202] [cursor=pointer]:
+          - generic [ref=e203]:
+            - radio "📊 单期权分析" [checked]
+            - paragraph [ref=e208]: 📊 单期权分析
+          - generic [ref=e209]:
+            - radio "🔗 组合分析 (价差+期权)"
+            - paragraph [ref=e214]: 🔗 组合分析 (价差+期权)
+          - generic [ref=e215]:
+            - radio "📡 IB 实时期权链"
+            - paragraph [ref=e220]: 📡 IB 实时期权链
+          - generic [ref=e221]:
+            - radio "📈 期权链可视化"
+            - paragraph [ref=e226]: 📈 期权链可视化
+      - generic [ref=e228]:
+        - generic [ref=e230]:
+          - heading "📝 参数配置" [level=3] [ref=e235]:
+            - text: 📝 参数配置
+            - generic [ref=e236]:
+              - link "Link to heading":
+                - /url: "#d2616c16"
+                - img
+          - generic [ref=e238]:
+            - paragraph [ref=e242]: 期权类型
+            - generic [ref=e244]:
+              - generic [ref=e245]:
+                - generic [ref=e246]: 看涨期权 (Call)
+                - combobox "Selected 看涨期权 (Call). 期权类型" [ref=e248]
+              - img "open" [ref=e250]
+          - generic [ref=e253]:
+            - paragraph [ref=e257]: 标的资产价格 (S₀)
+            - generic [ref=e258]:
+              - spinbutton "标的资产价格 (S₀)" [ref=e261]: "100.00"
+              - generic [ref=e262]:
+                - button [ref=e263] [cursor=pointer]:
+                  - img [ref=e264]
+                - button [ref=e266] [cursor=pointer]:
+                  - img [ref=e267]
+          - generic [ref=e270]:
+            - paragraph [ref=e274]: 行权价 (K)
+            - generic [ref=e275]:
+              - spinbutton "行权价 (K)" [ref=e278]: "100.00"
+              - generic [ref=e279]:
+                - button [ref=e280] [cursor=pointer]:
+                  - img [ref=e281]
+                - button [ref=e283] [cursor=pointer]:
+                  - img [ref=e284]
+          - generic [ref=e288]:
+            - paragraph [ref=e292]: 到期天数
+            - generic [ref=e293]:
+              - slider "到期天数" [ref=e297]:
+                - generic:
+                  - generic:
+                    - paragraph: "30"
+              - generic:
+                - generic:
+                  - paragraph: "1"
+                - generic:
+                  - paragraph: "365"
+          - generic [ref=e301]:
+            - paragraph [ref=e305]: 隐含波动率 (%)
+            - generic [ref=e306]:
+              - slider "隐含波动率 (%)" [ref=e310]:
+                - generic:
+                  - generic:
+                    - paragraph: "30"
+              - generic:
+                - generic:
+                  - paragraph: "5"
+                - generic:
+                  - paragraph: "200"
+          - generic [ref=e313]:
+            - paragraph [ref=e317]: 无风险利率 (%)
+            - generic [ref=e318]:
+              - spinbutton "无风险利率 (%)" [ref=e321]: "5.00"
+              - generic [ref=e322]:
+                - button [ref=e323] [cursor=pointer]:
+                  - img [ref=e324]
+                - button [ref=e326] [cursor=pointer]:
+                  - img [ref=e327]
+        - generic [ref=e330]:
+          - heading "📊 分析结果" [level=3] [ref=e335]:
+            - text: 📊 分析结果
+            - generic [ref=e336]:
+              - link "Link to heading":
+                - /url: "#27043a74"
+                - img
+          - generic [ref=e338]:
+            - generic [ref=e343]:
+              - paragraph [ref=e347]: Delta
+              - paragraph [ref=e351]: "0.5362"
+            - generic [ref=e356]:
+              - paragraph [ref=e360]: Gamma
+              - paragraph [ref=e364]: "0.0462"
+            - generic [ref=e369]:
+              - paragraph [ref=e373]: Theta
+              - paragraph [ref=e377]: "-0.0638"
+            - generic [ref=e382]:
+              - paragraph [ref=e386]: Vega
+              - paragraph [ref=e390]: "0.1139"
+            - generic [ref=e395]:
+              - paragraph [ref=e399]: Rho
+              - paragraph [ref=e403]: "0.0411"
+          - generic [ref=e406]:
+            - paragraph [ref=e410]: 期权理论价格
+            - paragraph [ref=e414]: $3.6321
+      - heading "📈 盈亏分析图" [level=3] [ref=e418]:
+        - text: 📈 盈亏分析图
+        - generic [ref=e419]:
+          - link "Link to heading":
+            - /url: "#f7cfc3e"
+            - img
+      - generic [ref=e422]:
+        - button "Fullscreen" [ref=e427] [cursor=pointer]:
+          - img [ref=e428]
+        - img "0" [ref=e433]
+      - heading "🔑 关键价格点" [level=3] [ref=e437]:
+        - text: 🔑 关键价格点
+        - generic [ref=e438]:
+          - link "Link to heading":
+            - /url: "#3ab52282"
+            - img
+      - generic [ref=e171]:
+        - generic [ref=e441]:
+          - paragraph [ref=e445]: 盈亏平衡点
+          - paragraph [ref=e449]: $100.00
+        - generic [ref=e452]:
+          - paragraph [ref=e456]: 最大盈利
+          - paragraph [ref=e460]: 无限
+        - generic [ref=e463]:
+          - paragraph [ref=e467]: 最大亏损
+          - paragraph [ref=e471]: $0.00

@@ -1,0 +1,185 @@
+- generic:
+  - generic:
+    - generic [ref=e2]:
+      - generic [ref=e7]:
+        - button "keyboard_double_arrow_left" [ref=e430] [cursor=pointer]:
+          - generic [ref=e432]: keyboard_double_arrow_left
+        - list [ref=e10]:
+          - listitem [ref=e11]:
+            - link "app" [ref=e13] [cursor=pointer]:
+              - /url: http://localhost:8501/
+              - paragraph [ref=e16]: app
+          - listitem [ref=e17]:
+            - link "resonance" [ref=e19] [cursor=pointer]:
+              - /url: http://localhost:8501/resonance
+              - paragraph [ref=e22]: resonance
+          - listitem [ref=e23]:
+            - link "news center" [ref=e25] [cursor=pointer]:
+              - /url: http://localhost:8501/news_center
+              - paragraph [ref=e28]: news center
+          - listitem [ref=e29]:
+            - link "alerts" [ref=e31] [cursor=pointer]:
+              - /url: http://localhost:8501/alerts
+              - paragraph [ref=e34]: alerts
+        - generic [ref=e38]:
+          - heading "常用品种" [level=3] [ref=e42]
+          - generic [ref=e44]:
+            - paragraph [ref=e48]: 选择品种
+            - generic [ref=e50]:
+              - generic [ref=e51]:
+                - generic [ref=e52]: DOGE-USDT-SWAP - DOGE永续
+                - combobox "Selected DOGE-USDT-SWAP - DOGE永续. 选择品种" [expanded] [active] [ref=e54]
+              - img "open" [ref=e56]
+          - generic [ref=e59]:
+            - paragraph [ref=e63]: 输入品种代码
+            - textbox "输入品种代码" [ref=e66]:
+              - /placeholder: "如: TSLA, AAPL, DOGEUSDT..."
+          - separator [ref=e71]
+          - heading "🔗 跨品种套利" [level=3] [ref=e75]
+          - generic [ref=e78] [cursor=pointer]:
+            - checkbox "启用双品种模式"
+            - paragraph [ref=e84]: 启用双品种模式
+          - separator [ref=e89]
+          - heading "⚙️ 设置" [level=3] [ref=e93]
+          - generic [ref=e95]:
+            - paragraph [ref=e99]: 数据周期
+            - generic [ref=e101]:
+              - generic [ref=e102]:
+                - generic [ref=e103]: 1D
+                - combobox "Selected 1D. 数据周期" [ref=e105]
+              - img "open" [ref=e107]
+          - generic [ref=e111] [cursor=pointer]:
+            - checkbox "自动刷新"
+            - paragraph [ref=e117]: 自动刷新
+      - generic [ref=e3]:
+        - banner [ref=e120]:
+          - generic [ref=e123]:
+            - button "Deploy" [ref=e134] [cursor=pointer]:
+              - generic [ref=e136]: Deploy
+            - button "Main menu" [ref=e138] [cursor=pointer]:
+              - img [ref=e139]
+        - generic [ref=e142]:
+          - heading "📈 多周期共振分析" [level=3] [ref=e147]:
+            - text: 📈 多周期共振分析
+            - generic [ref=e148]:
+              - link "Link to heading":
+                - /url: "#9b42f304"
+                - img
+          - separator [ref=e153]
+          - heading "📊 各周期趋势" [level=3] [ref=e167]:
+            - text: 📊 各周期趋势
+            - generic [ref=e168]:
+              - link "Link to heading":
+                - /url: "#fbcccc50"
+                - img
+          - generic [ref=e170]:
+            - generic [ref=e174]:
+              - paragraph [ref=e179]:
+                - strong [ref=e180]: 1分钟 ➡️
+              - generic [ref=e183]:
+                - paragraph [ref=e186]: 价格
+                - paragraph [ref=e189]: "0.0983"
+              - paragraph [ref=e194]: "RSI: 87.0"
+            - generic [ref=e198]:
+              - paragraph [ref=e203]:
+                - strong [ref=e204]: 5分钟 ➡️
+              - generic [ref=e207]:
+                - paragraph [ref=e210]: 价格
+                - paragraph [ref=e213]: "0.0983"
+              - paragraph [ref=e218]: "RSI: 66.7"
+            - generic [ref=e222]:
+              - paragraph [ref=e227]:
+                - strong [ref=e228]: 30分钟 ➡️
+              - generic [ref=e231]:
+                - paragraph [ref=e234]: 价格
+                - paragraph [ref=e237]: "0.0983"
+              - paragraph [ref=e242]: "RSI: 54.3"
+            - generic [ref=e246]:
+              - paragraph [ref=e251]:
+                - strong [ref=e252]: 4小时 📈
+              - generic [ref=e255]:
+                - paragraph [ref=e258]: 价格
+                - paragraph [ref=e261]: "0.0983"
+              - paragraph [ref=e266]: "RSI: 52.4"
+            - generic [ref=e270]:
+              - paragraph [ref=e275]:
+                - strong [ref=e276]: 日线 📈
+              - generic [ref=e279]:
+                - paragraph [ref=e282]: 价格
+                - paragraph [ref=e285]: "0.0983"
+              - paragraph [ref=e290]: "RSI: 60.6"
+          - separator [ref=e295]
+          - generic [ref=e297]:
+            - alert [ref=e302]:
+              - generic [ref=e305]:
+                - generic [ref=e308]: ✅
+                - paragraph [ref=e310]: 各周期趋势一致，无明显矛盾
+            - generic [ref=e314]:
+              - heading "💡 交易建议 ➡️" [level=3] [ref=e320]:
+                - text: 💡 交易建议 ➡️
+                - generic [ref=e321]:
+                  - link "Link to heading":
+                    - /url: "#f88af98e"
+                    - img
+              - generic [ref=e323]:
+                - generic [ref=e325]:
+                  - paragraph [ref=e330]:
+                    - strong [ref=e331]: 建议方向
+                    - text: ":"
+                    - code [ref=e332]: 观望
+                  - paragraph [ref=e337]:
+                    - strong [ref=e338]: 置信度
+                    - text: ": 低"
+                - paragraph [ref=e345]:
+                  - strong [ref=e346]: 原因
+                  - text: ": 共振较弱，建议观望"
+          - separator [ref=e351]
+          - heading "🎯 共振分数" [level=3] [ref=e357]:
+            - text: 🎯 共振分数
+            - generic [ref=e358]:
+              - link "Link to heading":
+                - /url: "#44292e3f"
+                - img
+          - generic [ref=e360]:
+            - generic [ref=e364]:
+              - paragraph [ref=e367]: 40 分 (低共振)
+              - progressbar "40% Loaded" [ref=e368]
+            - paragraph [ref=e378]: "📈 上涨: 2 📉 下跌: 0 ➡️ 震荡: 3"
+          - separator [ref=e383]
+          - heading "📋 多周期汇总" [level=3] [ref=e389]:
+            - text: 📋 多周期汇总
+            - generic [ref=e390]:
+              - link "Link to heading":
+                - /url: "#838a4081"
+                - img
+          - generic [ref=e395]:
+            - button "Show/hide columns" [ref=e399] [cursor=pointer]:
+              - img [ref=e400]
+            - button "Download as CSV" [ref=e405] [cursor=pointer]:
+              - img [ref=e406]
+            - button "Search" [ref=e411] [cursor=pointer]:
+              - img [ref=e412]
+            - button "Fullscreen" [ref=e417] [cursor=pointer]:
+              - img [ref=e418]
+    - list [ref=e436]:
+      - generic [ref=e438]:
+        - option "DOGE-USDT-SWAP - DOGE永续" [selected] [ref=e439] [cursor=pointer]:
+          - generic [ref=e443]: DOGE-USDT-SWAP - DOGE永续
+        - option "ETH-USDT-SWAP - ETH永续" [ref=e444] [cursor=pointer]:
+          - generic [ref=e448]: ETH-USDT-SWAP - ETH永续
+        - option "BTC-USDT-SWAP - BTC永续" [ref=e449] [cursor=pointer]:
+          - generic [ref=e453]: BTC-USDT-SWAP - BTC永续
+        - option "AAPL - Apple" [ref=e454] [cursor=pointer]:
+          - generic [ref=e458]: AAPL - Apple
+        - option "TSLA - Tesla" [ref=e459] [cursor=pointer]:
+          - generic [ref=e463]: TSLA - Tesla
+        - option "MNQ - E-mini Nasdaq 100" [ref=e464] [cursor=pointer]:
+          - generic [ref=e468]: MNQ - E-mini Nasdaq 100
+        - option "MYM - E-mini Dow Jones" [ref=e469] [cursor=pointer]:
+          - generic [ref=e473]: MYM - E-mini Dow Jones
+        - option "RB - Gasoline" [ref=e474] [cursor=pointer]:
+          - generic [ref=e478]: RB - Gasoline
+        - option "HO - Heating Oil" [ref=e479] [cursor=pointer]:
+          - generic [ref=e483]: HO - Heating Oil
+        - option "MHG - Micro Copper" [ref=e484] [cursor=pointer]:
+          - generic [ref=e488]: MHG - Micro Copper

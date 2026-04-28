@@ -1,0 +1,44 @@
+def _scan_three_screen_symbols(ds, gen, symbols, request):
+    from quant_core.data import load_symbols
+
+    results = []
+
+    # Batch fetch all symbols for each timeframe (3 calls instead of 3*N calls)
+    try:
+        m30_batch = ds.get_history_batch(symbols, num=request.num_m30, timeframe=request.bar_size_m30)
+        m5_batch = ds.get_history_batch(symbols, num=request.num_m5, timeframe=request.bar_size_m5)
+        m1_batch = ds.get_history_batch(symbols, num=request.num_m1, timeframe=request.bar_size_m1)
+    except Exception:
+        return results
+
+    for symbol in symbols:
+        try:
+            m30_bars = m30_batch.get(symbol, [])
+            m5_bars = m5_batch.get(symbol, [])
+            m1_bars = m1_batch.get(symbol, [])
+
+            if not all([m30_bars, m5_bars, m1_bars]):
+                continue
+
+            signal = gen.generate(symbol, m30_bars, m5_bars, m1_bars)
+
+            results.append(
+                {
+                    "symbol": symbol,
+                    "trend": signal.m30_trend.value,
+                    "pullback": signal.m5_pullback,
+                    "pullback_reason": signal.signal_reason,
+                    "entry": signal.m1_entry.value,
+                    "strength": signal.strength,
+                    "support": signal.support_level,
+                    "resistance": signal.resistance_level,
+                    "entry_price": signal.entry_price,
+                    "stop_loss": signal.stop_loss,
+                    "risk_reward": signal.risk_reward_ratio,
+                }
+            )
+        except Exception:
+            continue
+    return results
+
+

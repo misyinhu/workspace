@@ -1,0 +1,57 @@
+- generic [ref=e2]:
+  - list [ref=e10]:
+    - listitem [ref=e11]:
+      - link "app" [ref=e13] [cursor=pointer]:
+        - /url: http://localhost:8502/
+        - generic [ref=e14]: app
+    - listitem [ref=e15]:
+      - link "news center" [ref=e17] [cursor=pointer]:
+        - /url: http://localhost:8502/news_center
+        - generic [ref=e18]: news center
+    - listitem [ref=e19]:
+      - link "alerts" [ref=e21] [cursor=pointer]:
+        - /url: http://localhost:8502/alerts
+        - generic [ref=e22]: alerts
+    - listitem [ref=e23]:
+      - link "market scan" [ref=e25] [cursor=pointer]:
+        - /url: http://localhost:8502/market_scan
+        - generic [ref=e26]: market scan
+    - listitem [ref=e27]:
+      - link "three screen" [ref=e29] [cursor=pointer]:
+        - /url: http://localhost:8502/three_screen
+        - generic [ref=e30]: three screen
+    - listitem [ref=e31]:
+      - link "resonance" [ref=e33] [cursor=pointer]:
+        - /url: http://localhost:8502/resonance
+        - generic [ref=e34]: resonance
+    - listitem [ref=e35]:
+      - link "chart demo" [ref=e37] [cursor=pointer]:
+        - /url: http://localhost:8502/chart_demo
+        - generic [ref=e38]: chart demo
+  - generic [ref=e3]:
+    - banner [ref=e42]:
+      - generic [ref=e45]:
+        - button "Deploy" [ref=e47] [cursor=pointer]:
+          - generic [ref=e49]: Deploy
+        - button [ref=e51] [cursor=pointer]:
+          - img [ref=e52]
+    - generic [ref=e55]:
+      - heading "📊 完整 Lightweight Charts 演示" [level=1] [ref=e60]:
+        - text: 📊 完整 Lightweight Charts 演示
+        - generic [ref=e61]:
+          - link "Link to heading":
+            - /url: "#lightweight-charts"
+            - img
+      - iframe [ref=e63]:
+        - table [ref=f2e4]:
+          - row [ref=f2e5]:
+            - cell
+            - cell [ref=f2e6]
+            - cell [ref=f2e10]
+          - row [ref=f2e14]:
+            - cell
+            - cell [ref=f2e15]
+            - cell [ref=f2e19]
+      - separator [ref=e68]
+      - alert [ref=e71]:
+        - paragraph [ref=e76]: ✅ 使用原始 lightweight-charts JS 实现，支持：缩放、拖拽、十字光标、实时数据更新、指标叠加等完整功能

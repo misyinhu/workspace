@@ -1,0 +1,125 @@
+- generic:
+  - generic:
+    - generic [ref=e2]:
+      - list [ref=e10]:
+        - listitem [ref=e11]:
+          - link "app" [ref=e13] [cursor=pointer]:
+            - /url: http://127.0.0.1:8502/
+            - generic [ref=e14]: app
+        - listitem [ref=e15]:
+          - link "news center" [ref=e17] [cursor=pointer]:
+            - /url: http://127.0.0.1:8502/news_center
+            - generic [ref=e18]: news center
+        - listitem [ref=e19]:
+          - link "resonance" [ref=e21] [cursor=pointer]:
+            - /url: http://127.0.0.1:8502/resonance
+            - generic [ref=e22]: resonance
+        - listitem [ref=e23]:
+          - link "alerts" [ref=e25] [cursor=pointer]:
+            - /url: http://127.0.0.1:8502/alerts
+            - generic [ref=e26]: alerts
+      - generic [ref=e3]:
+        - banner [ref=e30]:
+          - generic [ref=e33]:
+            - button "Deploy" [ref=e35] [cursor=pointer]:
+              - generic [ref=e37]: Deploy
+            - button [ref=e39] [cursor=pointer]:
+              - img [ref=e40]
+        - generic [ref=e43]:
+          - heading "🚨 警报中心" [level=3] [ref=e49]:
+            - text: 🚨 警报中心
+            - generic [ref=e50]:
+              - link "Link to heading":
+                - /url: "#242fb20c"
+                - img
+          - paragraph [ref=e55]: 遍历所有 TradingView 布局实时监控指标
+          - paragraph [ref=e60]:
+            - strong [ref=e61]: 📅 周期选择
+          - generic [ref=e63]:
+            - generic [ref=e69]:
+              - generic [ref=e70]:
+                - generic [ref=e71]: 5m
+                - combobox "Selected 5m. 选择要监控的周期" [expanded] [active] [ref=e73]
+              - img "open" [ref=e75]
+            - alert [ref=e81]:
+              - paragraph [ref=e86]:
+                - text: 📌 请在 TradingView 中手动切换到
+                - strong [ref=e87]: 5m
+                - text: 周期后再读取
+          - heading "📊 已扫描 7 个布局" [level=4] [ref=e93]:
+            - text: 📊 已扫描 7 个布局
+            - generic [ref=e94]:
+              - link "Link to heading":
+                - /url: "#7"
+                - img
+          - group [ref=e97]:
+            - generic "keyboard_arrow_right 查看扫描的布局" [ref=e98] [cursor=pointer]:
+              - generic [ref=e99]:
+                - generic [ref=e101]: keyboard_arrow_right
+                - paragraph [ref=e104]: 查看扫描的布局
+          - group [ref=e107]:
+            - generic "keyboard_arrow_right 📑 Tab 0 - FX:XAUUSD" [ref=e108] [cursor=pointer]:
+              - generic [ref=e109]:
+                - generic [ref=e111]: keyboard_arrow_right
+                - paragraph [ref=e114]: 📑 Tab 0 - FX:XAUUSD
+          - group [ref=e117]:
+            - generic "keyboard_arrow_right 📑 Tab 0 - OANDA:EURUSD" [ref=e118] [cursor=pointer]:
+              - generic [ref=e119]:
+                - generic [ref=e121]: keyboard_arrow_right
+                - paragraph [ref=e124]: 📑 Tab 0 - OANDA:EURUSD
+          - group [ref=e127]:
+            - generic "keyboard_arrow_right 📑 Tab 0 - TVC:USOIL" [ref=e128] [cursor=pointer]:
+              - generic [ref=e129]:
+                - generic [ref=e131]: keyboard_arrow_right
+                - paragraph [ref=e134]: 📑 Tab 0 - TVC:USOIL
+          - group [ref=e137]:
+            - generic "keyboard_arrow_right 📑 Tab 0 - ACTIVTRADES:USATECM2026" [ref=e138] [cursor=pointer]:
+              - generic [ref=e139]:
+                - generic [ref=e141]: keyboard_arrow_right
+                - paragraph [ref=e144]: 📑 Tab 0 - ACTIVTRADES:USATECM2026
+          - group [ref=e147]:
+            - generic "keyboard_arrow_right 📑 Tab 0 - PIONEX:DOGEETH.P" [ref=e148] [cursor=pointer]:
+              - generic [ref=e149]:
+                - generic [ref=e151]: keyboard_arrow_right
+                - paragraph [ref=e154]: 📑 Tab 0 - PIONEX:DOGEETH.P
+          - group [ref=e157]:
+            - generic "keyboard_arrow_right 📑 Tab 0 - OANDA:AUDJPY" [ref=e158] [cursor=pointer]:
+              - generic [ref=e159]:
+                - generic [ref=e161]: keyboard_arrow_right
+                - paragraph [ref=e164]: 📑 Tab 0 - OANDA:AUDJPY
+          - group [ref=e167]:
+            - generic "keyboard_arrow_right 📑 Tab 0 - HKEX_DLY:100" [ref=e168] [cursor=pointer]:
+              - generic [ref=e169]:
+                - generic [ref=e171]: keyboard_arrow_right
+                - paragraph [ref=e174]: 📑 Tab 0 - HKEX_DLY:100
+          - separator [ref=e179]
+          - heading "🔔 活跃警报" [level=4] [ref=e185]:
+            - text: 🔔 活跃警报
+            - generic [ref=e186]:
+              - link "Link to heading":
+                - /url: "#5bcd0629"
+                - img
+          - alert [ref=e189]:
+            - paragraph [ref=e194]:
+              - strong [ref=e195]: 🟡
+              - text: "| Tab 0 (ACTIVTRADES:USATECM2026) | Z-Score 达到 2.20"
+          - alert [ref=e198]:
+            - paragraph [ref=e203]:
+              - strong [ref=e204]: 🟡
+              - text: "| Tab 0 (ACTIVTRADES:USATECM2026) | 相关性降至 -0.16"
+          - alert [ref=e207]:
+            - paragraph [ref=e212]:
+              - strong [ref=e213]: 🟡
+              - text: "| Tab 0 (HKEX_DLY:100) | Z-Score 达到 -2.65"
+          - button "🔄 立即刷新" [ref=e216] [cursor=pointer]:
+            - paragraph [ref=e220]: 🔄 立即刷新
+    - list [ref=e224]:
+      - generic [ref=e226]:
+        - option "1m" [ref=e227] [cursor=pointer]:
+          - generic [ref=e230]: 1m
+        - option "5m" [selected] [ref=e231] [cursor=pointer]:
+          - generic [ref=e234]: 5m
+        - option "30m" [ref=e235] [cursor=pointer]:
+          - generic [ref=e238]: 30m
+        - option "4h" [ref=e239] [cursor=pointer]:
+          - generic [ref=e242]: 4h

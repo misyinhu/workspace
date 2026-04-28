@@ -1,0 +1,85 @@
+- generic:
+  - generic:
+    - generic [ref=e2]:
+      - generic [ref=e7]:
+        - list [ref=e10]:
+          - listitem [ref=e11]:
+            - link "app" [ref=e13] [cursor=pointer]:
+              - /url: http://localhost:8502/
+              - generic [ref=e14]: app
+          - listitem [ref=e15]:
+            - link "news center" [ref=e17] [cursor=pointer]:
+              - /url: http://localhost:8502/news_center
+              - generic [ref=e18]: news center
+          - listitem [ref=e19]:
+            - link "alerts" [ref=e21] [cursor=pointer]:
+              - /url: http://localhost:8502/alerts
+              - generic [ref=e22]: alerts
+          - listitem [ref=e23]:
+            - link "market scan" [ref=e25] [cursor=pointer]:
+              - /url: http://localhost:8502/market_scan
+              - generic [ref=e26]: market scan
+          - listitem [ref=e27]:
+            - link "three screen" [ref=e29] [cursor=pointer]:
+              - /url: http://localhost:8502/three_screen
+              - generic [ref=e30]: three screen
+          - listitem [ref=e31]:
+            - link "resonance" [ref=e33] [cursor=pointer]:
+              - /url: http://localhost:8502/resonance
+              - generic [ref=e34]: resonance
+          - listitem [ref=e35]:
+            - link "cross timeframe" [ref=e37] [cursor=pointer]:
+              - /url: http://localhost:8502/cross_timeframe
+              - generic [ref=e38]: cross timeframe
+          - listitem [ref=e39]:
+            - link "chart demo" [ref=e41] [cursor=pointer]:
+              - /url: http://localhost:8502/chart_demo
+              - generic [ref=e42]: chart demo
+        - generic [ref=e46]:
+          - heading "选择分析品种" [level=3] [ref=e50]
+          - generic [ref=e52]:
+            - paragraph [ref=e56]: 常用品种
+            - generic [ref=e58]:
+              - generic [ref=e59]:
+                - generic [ref=e60]: DOGE-USDT-SWAP - DOGE永续
+                - combobox "Selected DOGE-USDT-SWAP - DOGE永续. 常用品种" [ref=e62]
+              - img "open" [ref=e64]
+          - generic [ref=e67]:
+            - paragraph [ref=e71]: 输入品种代码
+            - textbox "输入品种代码" [ref=e74]:
+              - /placeholder: "如: TSLA, AAPL, DOGEUSDT..."
+          - separator [ref=e79]
+          - heading "🔗 跨品种套利" [level=3] [ref=e83]
+          - generic [ref=e86] [cursor=pointer]:
+            - checkbox "启用双品种模式"
+            - paragraph [ref=e92]: 启用双品种模式
+          - separator [ref=e97]
+          - heading "⚙️ 设置" [level=3] [ref=e101]
+          - generic [ref=e104] [cursor=pointer]:
+            - checkbox "自动刷新"
+            - paragraph [ref=e110]: 自动刷新
+      - generic [ref=e3]:
+        - banner [ref=e113]:
+          - generic [ref=e116]:
+            - generic [ref=e118]:
+              - img "Running..." [ref=e119]:
+                - img [ref=e120]
+              - button "Stop" [ref=e124] [cursor=pointer]
+            - button "Deploy" [ref=e126] [cursor=pointer]:
+              - generic [ref=e128]: Deploy
+            - button [ref=e130] [cursor=pointer]:
+              - img [ref=e131]
+        - generic [ref=e134]:
+          - heading "📈 多周期共振分析" [level=3] [ref=e139]:
+            - text: 📈 多周期共振分析
+            - generic [ref=e140]:
+              - link "Link to heading":
+                - /url: "#9b42f304"
+                - img
+          - separator [ref=e145]
+          - paragraph [ref=e153]: 加载数据中...
+    - dialog "dialog" [ref=e156]:
+      - generic [ref=e157]: Page not found
+      - generic [ref=e159]: The page that you have requested does not seem to exist. Running the app's main page.
+      - button "Close" [active] [ref=e160] [cursor=pointer]:
+        - img [ref=e161]

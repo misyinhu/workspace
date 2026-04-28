@@ -2,7 +2,7 @@ import asyncio
 from ib_insync import IB
 
 ib = IB()
-ib.connect('127.0.0.1', 4002, clientId=99)
+ib.connect('127.0.0.1', 4002, clientId=999)
 positions = ib.positions()
 for p in positions:
     if p.contract.symbol == 'BTC':

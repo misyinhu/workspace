@@ -2,6 +2,7 @@
 
 Re-exports functions from src modules for easy importing by pages and tests.
 """
+
 import streamlit as st
 
 # Re-export from src modules
@@ -32,13 +33,14 @@ st.set_page_config(
 st.sidebar.title("📊 Kanban")
 st.sidebar.markdown("---")
 st.sidebar.markdown("**页面导航:**")
-st.sidebar.page_link("pages/01_resonance.py", label="📈 多周期共振分析")
-st.sidebar.page_link("pages/02_news_center.py", label="📰 新闻事件中心")
-st.sidebar.page_link("pages/03_alerts.py", label="🚨 警报中心")
+st.sidebar.page_link("pages/0_news_center.py", label="📰 新闻事件中心")
+st.sidebar.page_link("pages/1_alerts.py", label="🚨 警报中心")
+st.sidebar.page_link("pages/2_market_scan.py", label="🔍 市场扫描")
+st.sidebar.page_link("pages/3_three_screen.py", label="🔱 三重滤网")
+st.sidebar.page_link("pages/4_resonance.py", label="📈 多周期共振")
+st.sidebar.page_link("pages/5_cross_timeframe.py", label="🔄 跨周期分析")
 st.sidebar.markdown("---")
 st.sidebar.caption("Kanban v1.0")
 
-
-if __name__ == "__main__":
-    st.title("Welcome to Kanban")
-    st.markdown("请从侧边栏选择页面")
+# Default to resonance page
+st.switch_page("pages/4_resonance.py")

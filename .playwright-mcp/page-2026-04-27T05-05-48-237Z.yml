@@ -1,0 +1,105 @@
+- generic [ref=e2]:
+  - list [ref=e10]:
+    - listitem [ref=e11]:
+      - link "app" [ref=e13] [cursor=pointer]:
+        - /url: http://127.0.0.1:8502/
+        - generic [ref=e14]: app
+    - listitem [ref=e15]:
+      - link "news center" [ref=e17] [cursor=pointer]:
+        - /url: http://127.0.0.1:8502/news_center
+        - generic [ref=e18]: news center
+    - listitem [ref=e19]:
+      - link "resonance" [ref=e21] [cursor=pointer]:
+        - /url: http://127.0.0.1:8502/resonance
+        - generic [ref=e22]: resonance
+    - listitem [ref=e23]:
+      - link "alerts" [ref=e25] [cursor=pointer]:
+        - /url: http://127.0.0.1:8502/alerts
+        - generic [ref=e26]: alerts
+  - generic [ref=e3]:
+    - banner [ref=e30]:
+      - generic [ref=e33]:
+        - button "Deploy" [ref=e43] [cursor=pointer]:
+          - generic [ref=e45]: Deploy
+        - button [ref=e47] [cursor=pointer]:
+          - img [ref=e48]
+    - generic [ref=e51]:
+      - heading "🚨 警报中心" [level=3] [ref=e57]:
+        - text: 🚨 警报中心
+        - generic [ref=e58]:
+          - link "Link to heading":
+            - /url: "#242fb20c"
+            - img
+      - paragraph [ref=e63]: 遍历所有 TradingView 布局实时监控指标
+      - paragraph [ref=e68]:
+        - strong [ref=e69]: 📅 周期选择
+      - generic [ref=e71]:
+        - generic [ref=e77]:
+          - generic [ref=e78]:
+            - generic [ref=e79]: 5m
+            - combobox "Selected 5m. 选择要监控的周期" [ref=e81]
+          - img "open" [ref=e83]
+        - alert [ref=e89]:
+          - paragraph [ref=e94]:
+            - text: ✅ 已自动切换到
+            - strong [ref=e95]: 5m
+            - text: 周期
+      - heading "📊 已扫描 7 个布局" [level=4] [ref=e108]:
+        - text: 📊 已扫描 7 个布局
+        - generic [ref=e109]:
+          - link "Link to heading":
+            - /url: "#7"
+            - img
+      - group [ref=e112]:
+        - generic "keyboard_arrow_right 查看扫描的布局" [ref=e113] [cursor=pointer]:
+          - generic [ref=e114]:
+            - generic [ref=e116]: keyboard_arrow_right
+            - paragraph [ref=e119]: 查看扫描的布局
+      - group [ref=e122]:
+        - generic "keyboard_arrow_right 📑 Tab 0 - OANDA:AUDJPY" [ref=e123] [cursor=pointer]:
+          - generic [ref=e124]:
+            - generic [ref=e126]: keyboard_arrow_right
+            - paragraph [ref=e129]: 📑 Tab 0 - OANDA:AUDJPY
+      - group [ref=e132]:
+        - generic "keyboard_arrow_right 📑 Tab 1 - HKEX_DLY:100" [ref=e133] [cursor=pointer]:
+          - generic [ref=e134]:
+            - generic [ref=e136]: keyboard_arrow_right
+            - paragraph [ref=e139]: 📑 Tab 1 - HKEX_DLY:100
+      - group [ref=e142]:
+        - generic "keyboard_arrow_right 📑 Tab 2 - FX:XAUUSD" [ref=e143] [cursor=pointer]:
+          - generic [ref=e144]:
+            - generic [ref=e146]: keyboard_arrow_right
+            - paragraph [ref=e149]: 📑 Tab 2 - FX:XAUUSD
+      - group [ref=e152]:
+        - generic "keyboard_arrow_right 📑 Tab 3 - PIONEX:DOGEETH.P" [ref=e153] [cursor=pointer]:
+          - generic [ref=e154]:
+            - generic [ref=e156]: keyboard_arrow_right
+            - paragraph [ref=e159]: 📑 Tab 3 - PIONEX:DOGEETH.P
+      - group [ref=e162]:
+        - generic "keyboard_arrow_right 📑 Tab 4 - OANDA:EURUSD" [ref=e163] [cursor=pointer]:
+          - generic [ref=e164]:
+            - generic [ref=e166]: keyboard_arrow_right
+            - paragraph [ref=e169]: 📑 Tab 4 - OANDA:EURUSD
+      - group [ref=e172]:
+        - generic "keyboard_arrow_right 📑 Tab 5 - TVC:USOIL" [ref=e173] [cursor=pointer]:
+          - generic [ref=e174]:
+            - generic [ref=e176]: keyboard_arrow_right
+            - paragraph [ref=e179]: 📑 Tab 5 - TVC:USOIL
+      - group [ref=e182]:
+        - generic "keyboard_arrow_right 📑 Tab 6 - ACTIVTRADES:USATECM2026" [ref=e183] [cursor=pointer]:
+          - generic [ref=e184]:
+            - generic [ref=e186]: keyboard_arrow_right
+            - paragraph [ref=e189]: 📑 Tab 6 - ACTIVTRADES:USATECM2026
+      - separator [ref=e194]
+      - heading "🔔 活跃警报" [level=4] [ref=e200]:
+        - text: 🔔 活跃警报
+        - generic [ref=e201]:
+          - link "Link to heading":
+            - /url: "#5bcd0629"
+            - img
+      - alert [ref=e204]:
+        - paragraph [ref=e209]:
+          - strong [ref=e210]: 🟡
+          - text: "| Tab 0 (OANDA:AUDJPY) | 相关性降至 -0.63"
+      - button "🔄 立即刷新" [ref=e213] [cursor=pointer]:
+        - paragraph [ref=e217]: 🔄 立即刷新

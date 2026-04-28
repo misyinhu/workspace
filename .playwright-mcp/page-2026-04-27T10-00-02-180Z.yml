@@ -1,0 +1,50 @@
+- generic [ref=e2]:
+  - list [ref=e10]:
+    - listitem [ref=e11]:
+      - link "app" [ref=e13] [cursor=pointer]:
+        - /url: http://127.0.0.1:8502/
+        - generic [ref=e14]: app
+    - listitem [ref=e15]:
+      - link "news center" [ref=e17] [cursor=pointer]:
+        - /url: http://127.0.0.1:8502/news_center
+        - generic [ref=e18]: news center
+    - listitem [ref=e19]:
+      - link "resonance" [ref=e21] [cursor=pointer]:
+        - /url: http://127.0.0.1:8502/resonance
+        - generic [ref=e22]: resonance
+    - listitem [ref=e23]:
+      - link "alerts" [ref=e25] [cursor=pointer]:
+        - /url: http://127.0.0.1:8502/alerts
+        - generic [ref=e26]: alerts
+  - generic [ref=e3]:
+    - banner [ref=e30]:
+      - generic [ref=e33]:
+        - generic [ref=e35]:
+          - img "Running..." [ref=e36]:
+            - img [ref=e37]
+          - button "Stop" [ref=e41] [cursor=pointer]
+        - button "Deploy" [ref=e43] [cursor=pointer]:
+          - generic [ref=e45]: Deploy
+        - button [ref=e47] [cursor=pointer]:
+          - img [ref=e48]
+    - generic [ref=e51]:
+      - heading "🚨 警报中心" [level=3] [ref=e57]:
+        - text: 🚨 警报中心
+        - generic [ref=e58]:
+          - link "Link to heading":
+            - /url: "#242fb20c"
+            - img
+      - paragraph [ref=e63]: 遍历所有 TradingView 布局实时监控指标
+      - paragraph [ref=e68]:
+        - strong [ref=e69]: 📅 周期选择
+      - generic [ref=e71]:
+        - generic [ref=e77]:
+          - generic [ref=e78]:
+            - generic [ref=e79]: 5m
+            - combobox "Selected 5m. 选择要监控的周期" [ref=e81]
+          - img "open" [ref=e83]
+        - alert [ref=e89]:
+          - paragraph [ref=e94]:
+            - text: ✅ 已自动切换到
+            - strong [ref=e95]: 5m
+            - text: 周期

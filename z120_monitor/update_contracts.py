@@ -27,7 +27,7 @@ def get_main_contract(symbol: str, exchange: str, currency: str) -> tuple:
         
         async def fetch():
             ib = IB()
-            await ib.connectAsync('127.0.0.1', 4001, clientId=99)
+            await ib.connectAsync('127.0.0.1', 4001, clientId=999)
             
             contracts = ib.reqContractDetails(Future(symbol=symbol, exchange=exchange, currency=currency))
             if not contracts:

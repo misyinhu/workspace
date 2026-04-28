@@ -1,0 +1,71 @@
+- generic [ref=e2]:
+  - generic [ref=e7]:
+    - list [ref=e10]:
+      - listitem [ref=e11]:
+        - link "app" [ref=e13] [cursor=pointer]:
+          - /url: http://localhost:8501/
+          - generic [ref=e14]: app
+      - listitem [ref=e15]:
+        - link "resonance" [ref=e17] [cursor=pointer]:
+          - /url: http://localhost:8501/resonance
+          - generic [ref=e18]: resonance
+      - listitem [ref=e19]:
+        - link "news center" [ref=e21] [cursor=pointer]:
+          - /url: http://localhost:8501/news_center
+          - generic [ref=e22]: news center
+      - listitem [ref=e23]:
+        - link "alerts" [ref=e25] [cursor=pointer]:
+          - /url: http://localhost:8501/alerts
+          - generic [ref=e26]: alerts
+    - generic [ref=e30]:
+      - heading "🔍 品种选择" [level=1] [ref=e34]
+      - heading "常用品种" [level=3] [ref=e38]
+      - generic [ref=e40]:
+        - paragraph [ref=e44]: 选择品种
+        - generic [ref=e46]:
+          - generic [ref=e47]:
+            - generic [ref=e48]: DOGE-USDT-SWAP - DOGE永续
+            - combobox "Selected DOGE-USDT-SWAP - DOGE永续. 选择品种" [ref=e50]
+          - img "open" [ref=e52]
+      - heading "或输入品种" [level=3] [ref=e57]
+      - generic [ref=e59]:
+        - paragraph [ref=e63]: 输入品种代码
+        - textbox "输入品种代码" [active] [ref=e66]:
+          - /placeholder: "如: TSLA, AAPL, DOGEUSDT..."
+          - text: Circle
+      - separator [ref=e71]
+      - alert [ref=e435]:
+        - generic [ref=e439]:
+          - paragraph [ref=e440]:
+            - strong [ref=e441]: 自定义品种
+            - text: ": CIRCLE"
+          - paragraph [ref=e442]:
+            - strong [ref=e443]: 数据源
+            - text: ": TradingView"
+      - separator [ref=e444]
+      - heading "🔗 跨品种套利" [level=3] [ref=e447]
+      - generic [ref=e107] [cursor=pointer]:
+        - checkbox "启用双品种模式"
+        - paragraph [ref=e113]: 启用双品种模式
+      - separator [ref=e100]
+      - heading "⚙️ 设置" [level=3] [ref=e448]
+      - generic [ref=e125] [cursor=pointer]:
+        - checkbox "自动刷新"
+        - paragraph [ref=e131]: 自动刷新
+  - generic [ref=e3]:
+    - banner [ref=e134]:
+      - generic [ref=e137]:
+        - button "Deploy" [ref=e139] [cursor=pointer]:
+          - generic [ref=e141]: Deploy
+        - button [ref=e143] [cursor=pointer]:
+          - img [ref=e144]
+    - generic [ref=e147]:
+      - heading "📈 多周期共振分析" [level=3] [ref=e152]:
+        - text: 📈 多周期共振分析
+        - generic [ref=e153]:
+          - link "Link to heading":
+            - /url: "#9b42f304"
+            - img
+      - separator [ref=e158]
+      - alert [ref=e450]:
+        - paragraph [ref=e455]: 无法获取数据，请稍后重试

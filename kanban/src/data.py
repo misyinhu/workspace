@@ -1,6 +1,7 @@
 """Data fetching module."""
 
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from .config import QUANT_CORE_URL, CLIENT_ID, TIMEFRAMES
 
@@ -23,11 +24,20 @@ def get_tv_symbol_for_ib(symbol: str) -> str:
 
 
 def load_instruments_config() -> list:
-    """Load instruments from shared config."""
-    from .config import load_shared_config
+    """Load instruments from instruments.yaml."""
+    from pathlib import Path
+    import yaml
 
-    config = load_shared_config()
-    return config.get("instruments", [])
+    # instruments.yaml 在 kanban 目录下，不在 src/ 下
+    instruments_path = Path(__file__).parent.parent / "instruments.yaml"
+    try:
+        if instruments_path.exists():
+            with open(instruments_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+                return data.get("instruments", [])
+    except Exception:
+        pass
+    return []
 
 
 def get_source_for_symbol(symbol: str) -> str:
@@ -56,6 +66,17 @@ def _calculate_rsi(prices: list, period: int = 14) -> float:
     return 100 - (100 / (1 + rs))
 
 
+def _calculate_ema(prices: list, period: int = 20) -> float:
+    """Calculate EMA from price list."""
+    if not prices or len(prices) < period:
+        return sum(prices) / len(prices) if prices else 0
+    ema = prices[0]
+    multiplier = 2 / (period + 1)
+    for price in prices[1:]:
+        ema = (price - ema) * multiplier + ema
+    return ema
+
+
 def _calculate_trend_from_prices(prices: list) -> str:
     """Calculate trend from price list using MA20."""
     if not prices or len(prices) < 20:
@@ -69,6 +90,88 @@ def _calculate_trend_from_prices(prices: list) -> str:
     return "neutral"
 
 
+def _calculate_bias_reason(
+    prices: list, rsi: float, ema20: float, ema50: float, ema200: float | None = None
+) -> list:
+    """Calculate bias reasons based on indicators."""
+    reasons = []
+    if not prices or len(prices) < 2:
+        return reasons
+
+    current = prices[-1]
+    prev = prices[-2]
+
+    if ema200:
+        if current > ema200:
+            reasons.append(f"价格 ({current:.0f}) > 200 EMA ({ema200:.0f})")
+        else:
+            reasons.append(f"价格 ({current:.0f}) < 200 EMA ({ema200:.0f})")
+
+    if current > ema20 > ema50:
+        reasons.append("价格 > EMA20 > EMA50 (多头排列)")
+    elif current < ema20 < ema50:
+        reasons.append("价格 < EMA20 < EMA50 (空头排列)")
+
+    if rsi > 70:
+        reasons.append(f"RSI {rsi:.1f} 超买")
+    elif rsi < 30:
+        reasons.append(f"RSI {rsi:.1f} 超卖")
+    elif rsi > 50:
+        reasons.append(f"RSI {rsi:.1f} 偏多")
+    else:
+        reasons.append(f"RSI {rsi:.1f} 偏空")
+
+    if current > prev:
+        reasons.append(f"上涨 +{((current - prev) / prev * 100):.2f}%")
+    elif current < prev:
+        reasons.append(f"下跌 {((current - prev) / prev * 100):.2f}%")
+
+    return reasons
+
+
+def _calculate_momentum(prices: list, rsi: float) -> str:
+    """Calculate momentum direction."""
+    if not prices or len(prices) < 5:
+        return "neutral"
+    recent = prices[-5:]
+    if recent[-1] > recent[0]:
+        return "Rising"
+    elif recent[-1] < recent[0]:
+        return "Falling"
+    return "neutral"
+
+
+def _calculate_rsi_info(prices: list, period: int = 14) -> dict:
+    """Calculate detailed RSI info."""
+    if not prices or len(prices) < period + 1:
+        return {"value": 50, "signal": "Neutral", "direction": "neutral"}
+
+    current_rsi = _calculate_rsi(prices, period)
+    prev_prices = prices[:-period]
+    prev_rsi = _calculate_rsi(prev_prices, period) if len(prev_prices) >= period else 50
+
+    if current_rsi > 60:
+        signal = "Bullish"
+    elif current_rsi < 40:
+        signal = "Bearish"
+    else:
+        signal = "Neutral"
+
+    if current_rsi > prev_rsi:
+        direction = "Rising"
+    elif current_rsi < prev_rsi:
+        direction = "Falling"
+    else:
+        direction = "Neutral"
+
+    return {
+        "value": round(current_rsi, 2),
+        "signal": signal,
+        "direction": direction,
+        "previous": round(prev_rsi, 2),
+    }
+
+
 def fetch_from_tv_api(symbol: str) -> dict:
     """Fetch data via TradingView /api/tv/multi-timeframe endpoint."""
     result = {"symbol": symbol, "timeframes": {}, "resonance": {}}
@@ -77,7 +180,9 @@ def fetch_from_tv_api(symbol: str) -> dict:
     tf_map = {
         "1m": "1m",
         "5m": "5m",
+        "15m": "15m",
         "30m": "30m",
+        "1h": "1h",
         "4h": "4h",
         "1D": "1D",
     }
@@ -149,10 +254,6 @@ def fetch_from_tv_api(symbol: str) -> dict:
 
 def fetch_from_history(symbol: str, source: str) -> dict:
     """Fetch historical data and calculate indicators."""
-    # Use TradingView API for tradingview source
-    if source == "tradingview":
-        return fetch_from_tv_api(symbol)
-
     # Map symbol for different sources
     if source == "okx":
         symbol_map = {
@@ -168,35 +269,36 @@ def fetch_from_history(symbol: str, source: str) -> dict:
         api_symbol = symbol
 
     headers = {"X-Client-ID": CLIENT_ID}
-    result = {"symbol": symbol, "timeframes": {}, "resonance": {}}
+    result = {"symbol": symbol, "timeframes": {}, "resonance": {}, "error": None}
 
-    # Timeframe to bar mapping
+    # Timeframe to bar mapping (IB uses lowercase: 1h, 4h, not 1H, 4H)
     bar_map = {
         "1m": "1m",
         "5m": "5m",
         "15m": "15m",
         "30m": "30m",
-        "1h": "1H",
-        "4h": "4H",
+        "1h": "1h",
+        "4h": "4h",
         "1D": "1D",
         "1W": "1W",
     }
 
-    for tf in TIMEFRAMES:
+    def _fetch_single_timeframe(tf: str) -> tuple:
+        """Fetch and process a single timeframe."""
         bar = bar_map.get(tf, "1D")
         try:
-            # Try with num parameter first (latest N bars)
+            timeout = (15, 60) if source == "ib" else (10, 30)
             params = {
                 "symbol": api_symbol,
                 "source": source,
                 "bar": bar,
-                "num": 100,  # Get 100 bars for RSI calculation
+                "num": 500,
             }
             response = requests.get(
                 f"{QUANT_CORE_URL}/api/history",
                 params=params,
                 headers=headers,
-                timeout=30,
+                timeout=timeout,
             )
             if response.status_code == 200:
                 bars = response.json()
@@ -205,8 +307,16 @@ def fetch_from_history(symbol: str, source: str) -> dict:
                     if closes:
                         latest = bars[-1]
                         rsi = _calculate_rsi(closes)
+                        ema20 = _calculate_ema(closes, 20)
+                        ema50 = _calculate_ema(closes, 50)
+                        ema200 = _calculate_ema(closes, 200) if len(closes) >= 200 else None
                         trend = _calculate_trend_from_prices(closes)
-                        result["timeframes"][tf] = {
+                        bias_reasons = _calculate_bias_reason(closes, rsi, ema20, ema50, ema200)
+                        rsi_info = _calculate_rsi_info(closes)
+                        momentum = _calculate_momentum(closes, rsi)
+                        change_pct = ((closes[-1] - closes[len(closes) // 2]) / closes[len(closes) // 2] * 100) if len(closes) >= 2 else 0
+
+                        return tf, {
                             "close": latest.get("close", 0),
                             "open": latest.get("open", 0),
                             "high": latest.get("high", 0),
@@ -214,9 +324,39 @@ def fetch_from_history(symbol: str, source: str) -> dict:
                             "volume": latest.get("volume", 0),
                             "rsi": rsi,
                             "trend": trend,
+                            "bias": trend.upper(),
+                            "bias_reasons": bias_reasons,
+                            "rsi_info": rsi_info,
+                            "momentum": momentum,
+                            "ema20": round(ema20, 2),
+                            "ema50": round(ema50, 2),
+                            "ema200": round(ema200, 2) if ema200 else None,
+                            "change_pct": round(change_pct, 3),
+                            "key_indicators": ["EMA20", "EMA50", "RSI(14)", "MACD"],
+                            "bars": bars[-200:] if len(bars) > 200 else bars,
                         }
-        except Exception:
-            pass
+            elif response.status_code != 204:
+                try:
+                    error_data = response.json()
+                    return tf, {"error": error_data.get("error", response.text)}
+                except Exception:
+                    return tf, {"error": f"HTTP {response.status_code}: {response.text[:200]}"}
+        except requests.exceptions.RequestException as e:
+            return tf, {"error": f"请求错误: {str(e)}"}
+        except Exception as e:
+            return tf, {"error": f"数据获取失败: {str(e)}"}
+        return tf, None
+
+    # Parallel fetch all timeframes
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(_fetch_single_timeframe, tf): tf for tf in TIMEFRAMES}
+        for future in as_completed(futures):
+            tf, tf_data = future.result()
+            if tf_data:
+                if "error" in tf_data:
+                    result["error"] = tf_data["error"]
+                else:
+                    result["timeframes"][tf] = tf_data
 
     # Calculate resonance from trends
     trends = [
@@ -237,18 +377,31 @@ def fetch_from_history(symbol: str, source: str) -> dict:
     return result
 
 
-def fetch_multi_timeframe(symbol: str) -> dict:
-    """Fetch multi-timeframe data for a symbol."""
-    source = get_source_for_symbol(symbol)
+def fetch_multi_timeframe(symbol: str, source: str = "ib") -> dict:
+    """Fetch multi-timeframe data for a symbol.
+    
+    Args:
+        symbol: Trading symbol (e.g., "2513.HK", "TSLA")
+        source: Data source - "ib" for Interactive Brokers (default), "okx" for OKX
+    """
     return fetch_from_history(symbol, source)
 
 
 def fetch_pair_data(
-    symbol1: str, symbol2: str, bar: str = "1D", num: int = 100
+    symbol1: str, symbol2: str, bar: str = "1D", num: int = 100,
+    source1: str = "ib", source2: str = "ib"
 ) -> dict:
-    """获取双品种数据用于套利分析"""
-    source1 = get_source_for_symbol(symbol1)
-    source2 = get_source_for_symbol(symbol2)
+    """获取双品种数据用于套利分析
+    
+    Args:
+        symbol1: First trading symbol
+        symbol2: Second trading symbol  
+        bar: Timeframe (e.g., "1D", "5m")
+        num: Number of bars to fetch
+        source1: Data source for symbol1 (default "ib")
+        source2: Data source for symbol2 (default "ib")
+    """
+    # source1 and source2 are now passed directly, no lookup needed
 
     headers = {"X-Client-ID": CLIENT_ID}
 

@@ -1,56 +1,64 @@
 # 常用品种配置
 # 支持的数据源: okx, ib, tdxquant, tradingview
 
+# 常用品种配置 (kanban使用)
 instruments:
-  # 加密货币 (OKX)
-  - symbol: "DOGE-USDT"
+  - symbol: "DOGE-USDT-SWAP"
     name: "DOGE永续"
     exchange: "OKX"
     source: "okx"
-  
-  - symbol: "ETH-USDT"
+  - symbol: "ETH-USDT-SWAP"
     name: "ETH永续"
     exchange: "OKX"
     source: "okx"
-  
-  - symbol: "BTC-USDT"
+  - symbol: "BTC-USDT-SWAP"
     name: "BTC永续"
     exchange: "OKX"
     source: "okx"
-  
-  # 美股 (IB)
   - symbol: "AAPL"
     name: "Apple"
     exchange: "NASDAQ"
     source: "ib"
-  
   - symbol: "TSLA"
     name: "Tesla"
     exchange: "NASDAQ"
     source: "ib"
-  
-  # 期货 (IB)
-  - symbol: "ES"
-    name: "E-mini S&P 500"
-    exchange: "CME"
-    source: "ib"
-  
   - symbol: "MNQ"
     name: "E-mini Nasdaq 100"
     exchange: "CME"
     source: "ib"
-  
-  - symbol: "GC"
-    name: "Gold"
+  - symbol: "MYM"
+    name: "E-mini Dow Jones"
+    exchange: "CBOT"
+    source: "ib"
+  - symbol: "RB"
+    name: "Gasoline"
+    exchange: "NYMEX"
+    source: "ib"
+  - symbol: "HO"
+    name: "Heating Oil"
+    exchange: "NYMEX"
+    source: "ib"
+  - symbol: "MHG"
+    name: "Micro Copper"
     exchange: "COMEX"
     source: "ib"
-  
   - symbol: "MGC"
     name: "Micro Gold"
     exchange: "COMEX"
     source: "ib"
-    
-  - symbol: "MHG"
-    name: "Micro Gold Continuous"
-    exchange: "COMEX"
-    source: "ib"
+
+# 跨品种套利品种对配置
+spread_pairs:
+  - name: "MNQ-MYM"
+    symbol1: "MNQ"
+    symbol2: "MYM"
+  - name: "MHG-MGC"
+    symbol1: "MHG"
+    symbol2: "MGC"
+  - name: "RB-HO"
+    symbol1: "RB"
+    symbol2: "HO"
+  - name: "DOGE-ETH"
+    symbol1: "DOGE-USDT-SWAP"
+    symbol2: "ETH-USDT-SWAP"

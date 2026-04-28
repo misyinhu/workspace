@@ -29,6 +29,7 @@ TIMEFRAME_LABELS = {
 }
 TREND_EMOJI = {"up": "📈", "down": "📉", "neutral": "➡️"}
 TREND_CN = {"up": "上涨", "down": "下跌", "neutral": "震荡"}
+BIAS_CN = {"UP": "偏多", "DOWN": "偏空", "NEUTRAL": "中性"}
 
 
 def load_shared_config() -> dict:

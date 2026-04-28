@@ -1,0 +1,187 @@
+- generic [ref=e2]:
+  - generic [ref=e7]:
+    - list [ref=e10]:
+      - listitem [ref=e11]:
+        - link "app" [ref=e13] [cursor=pointer]:
+          - /url: http://localhost:8502/
+          - generic [ref=e14]: app
+      - listitem [ref=e15]:
+        - link "news center" [ref=e17] [cursor=pointer]:
+          - /url: http://localhost:8502/news_center
+          - generic [ref=e18]: news center
+      - listitem [ref=e19]:
+        - link "alerts" [ref=e21] [cursor=pointer]:
+          - /url: http://localhost:8502/alerts
+          - generic [ref=e22]: alerts
+      - listitem [ref=e23]:
+        - link "market scan" [ref=e25] [cursor=pointer]:
+          - /url: http://localhost:8502/market_scan
+          - generic [ref=e26]: market scan
+      - listitem [ref=e27]:
+        - link "three screen" [ref=e29] [cursor=pointer]:
+          - /url: http://localhost:8502/three_screen
+          - generic [ref=e30]: three screen
+      - listitem [ref=e31]:
+        - link "resonance" [ref=e33] [cursor=pointer]:
+          - /url: http://localhost:8502/resonance
+          - generic [ref=e34]: resonance
+      - listitem [ref=e35]:
+        - link "chart demo" [ref=e37] [cursor=pointer]:
+          - /url: http://localhost:8502/chart_demo
+          - generic [ref=e38]: chart demo
+    - generic [ref=e42]:
+      - heading "选择分析品种" [level=3] [ref=e46]
+      - generic [ref=e48]:
+        - paragraph [ref=e52]: 常用品种
+        - generic [ref=e54]:
+          - generic [ref=e55]:
+            - generic [ref=e56]: DOGE-USDT-SWAP - DOGE永续
+            - combobox "Selected DOGE-USDT-SWAP - DOGE永续. 常用品种" [ref=e58]
+          - img "open" [ref=e60]
+      - generic [ref=e63]:
+        - paragraph [ref=e67]: 输入品种代码
+        - textbox "输入品种代码" [ref=e70]:
+          - /placeholder: "如: TSLA, AAPL, DOGEUSDT..."
+      - separator [ref=e75]
+      - heading "🔗 跨品种套利" [level=3] [ref=e79]
+      - generic [ref=e82] [cursor=pointer]:
+        - checkbox "启用双品种模式"
+        - paragraph [ref=e88]: 启用双品种模式
+      - separator [ref=e93]
+      - heading "⚙️ 设置" [level=3] [ref=e97]
+      - generic [ref=e100] [cursor=pointer]:
+        - checkbox "自动刷新"
+        - paragraph [ref=e106]: 自动刷新
+  - generic [ref=e3]:
+    - banner [ref=e109]:
+      - generic [ref=e112]:
+        - button "Deploy" [ref=e122] [cursor=pointer]:
+          - generic [ref=e124]: Deploy
+        - button [ref=e126] [cursor=pointer]:
+          - img [ref=e127]
+    - generic [ref=e130]:
+      - heading "📈 多周期共振分析" [level=3] [ref=e135]:
+        - text: 📈 多周期共振分析
+        - generic [ref=e136]:
+          - link "Link to heading":
+            - /url: "#9b42f304"
+            - img
+      - separator [ref=e141]
+      - heading "📈 图表" [level=4] [ref=e155]:
+        - text: 📈 图表
+        - generic [ref=e156]:
+          - link "Link to heading":
+            - /url: "#3aca1048"
+            - img
+      - generic [ref=e158]:
+        - button "1m" [ref=e163] [cursor=pointer]:
+          - paragraph [ref=e167]: 1m
+        - button "5m" [ref=e172] [cursor=pointer]:
+          - paragraph [ref=e176]: 5m
+        - button "30m" [ref=e181] [cursor=pointer]:
+          - paragraph [ref=e185]: 30m
+        - button "4h" [ref=e190] [cursor=pointer]:
+          - paragraph [ref=e194]: 4h
+        - button "D" [ref=e199] [cursor=pointer]:
+          - paragraph [ref=e203]: D
+      - paragraph [ref=e208]: "数据: 200 bars"
+      - iframe [ref=e210]:
+        - table [ref=f1e4]:
+          - row [ref=f1e5]:
+            - cell
+            - cell [ref=f1e6]
+            - cell [ref=f1e10]
+          - row [ref=f1e14]:
+            - cell
+            - cell [ref=f1e15]
+            - cell [ref=f1e19]
+      - separator [ref=e215]
+      - generic [ref=e217]:
+        - heading "🎯 三滤网入场信号" [level=3] [ref=e223]:
+          - text: 🎯 三滤网入场信号
+          - generic [ref=e224]:
+            - link "Link to heading":
+              - /url: "#1bbb3cc1"
+              - img
+        - generic [ref=e226]:
+          - generic [ref=e228]:
+            - paragraph [ref=e233]:
+              - strong [ref=e234]: M30 趋势
+            - paragraph [ref=e239]: 中性
+          - generic [ref=e241]:
+            - paragraph [ref=e246]:
+              - strong [ref=e247]: M5 回调
+            - paragraph [ref=e252]: 无回调
+          - generic [ref=e254]:
+            - paragraph [ref=e259]:
+              - strong [ref=e260]: M1 入场
+            - paragraph [ref=e265]: 等待
+          - generic [ref=e267]:
+            - paragraph [ref=e272]:
+              - strong [ref=e273]: 信号强度
+            - paragraph [ref=e278]: "50"
+            - progressbar "50% Loaded" [ref=e282]
+      - separator [ref=e290]
+      - heading "📊 各周期趋势" [level=3] [ref=e296]:
+        - text: 📊 各周期趋势
+        - generic [ref=e297]:
+          - link "Link to heading":
+            - /url: "#fbcccc50"
+            - img
+      - generic [ref=e299]:
+        - generic [ref=e303]:
+          - paragraph [ref=e308]:
+            - strong [ref=e309]: 1分钟 ➡️
+          - paragraph [ref=e314]: 中性 +0.21%
+          - paragraph [ref=e319]: RSI 60 | MA20↓
+        - generic [ref=e323]:
+          - paragraph [ref=e328]:
+            - strong [ref=e329]: 5分钟 ➡️
+          - paragraph [ref=e334]: 中性 +0.47%
+          - paragraph [ref=e339]: RSI 56 | MA20↓
+        - generic [ref=e343]:
+          - paragraph [ref=e348]:
+            - strong [ref=e349]: 30分钟 ➡️
+          - paragraph [ref=e354]: 中性 +1.83%
+          - paragraph [ref=e359]: RSI 71 | MA20↓
+        - generic [ref=e363]:
+          - paragraph [ref=e368]:
+            - strong [ref=e369]: 4小时 ➡️
+          - paragraph [ref=e374]: 中性 +5.79%
+          - paragraph [ref=e379]: RSI 100 | MA20↓
+        - generic [ref=e383]:
+          - paragraph [ref=e388]:
+            - strong [ref=e389]: 日线 📈
+          - paragraph [ref=e394]: 偏多 +0.57%
+          - paragraph [ref=e399]: RSI 58 | MA20↓
+      - separator [ref=e404]
+      - heading "🎯 共振分数" [level=3] [ref=e410]:
+        - text: 🎯 共振分数
+        - generic [ref=e411]:
+          - link "Link to heading":
+            - /url: "#44292e3f"
+            - img
+      - generic [ref=e413]:
+        - generic [ref=e417]:
+          - paragraph [ref=e420]: 20 分 (低共振)
+          - progressbar "20% Loaded" [ref=e421]
+        - paragraph [ref=e431]: "📈 上涨: 1 📉 下跌: 0 ➡️ 震荡: 4"
+      - generic [ref=e433]:
+        - heading "💡 交易建议 ➡️" [level=3] [ref=e439]:
+          - text: 💡 交易建议 ➡️
+          - generic [ref=e440]:
+            - link "Link to heading":
+              - /url: "#f88af98e"
+              - img
+        - generic [ref=e442]:
+          - generic [ref=e444]:
+            - paragraph [ref=e449]:
+              - strong [ref=e450]: 建议方向
+              - text: ":"
+              - code [ref=e451]: 观望
+            - paragraph [ref=e456]:
+              - strong [ref=e457]: 置信度
+              - text: ": 低"
+          - paragraph [ref=e464]:
+            - strong [ref=e465]: 原因
+            - text: ": 共振较弱，建议观望"

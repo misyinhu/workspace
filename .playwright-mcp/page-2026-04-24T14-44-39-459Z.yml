@@ -1,0 +1,58 @@
+- generic [ref=e2]:
+  - generic [ref=e4]:
+    - button "keyboard_double_arrow_left" [ref=e7] [cursor=pointer]:
+      - generic [ref=e9]: keyboard_double_arrow_left
+    - list [ref=e11]:
+      - listitem [ref=e12]:
+        - link "app" [ref=e14] [cursor=pointer]:
+          - /url: http://100.82.238.11:8501/
+          - paragraph [ref=e17]: app
+      - listitem [ref=e18]:
+        - link "resonance" [ref=e20] [cursor=pointer]:
+          - /url: http://100.82.238.11:8501/resonance
+          - paragraph [ref=e23]: resonance
+      - listitem [ref=e24]:
+        - link "news center" [ref=e26] [cursor=pointer]:
+          - /url: http://100.82.238.11:8501/news_center
+          - paragraph [ref=e29]: news center
+      - listitem [ref=e30]:
+        - link "alerts" [ref=e32] [cursor=pointer]:
+          - /url: http://100.82.238.11:8501/alerts
+          - paragraph [ref=e35]: alerts
+    - generic [ref=e39]:
+      - heading "🔍 品种选择" [level=1] [ref=e43]
+      - heading "常用品种" [level=3] [ref=e47]
+      - heading "或输入品种" [level=3] [ref=e51]
+      - generic [ref=e53]:
+        - paragraph [ref=e57]: 输入品种代码
+        - textbox "输入品种代码" [ref=e60]:
+          - /placeholder: "如: TSLA, AAPL, DOGEUSDT..."
+      - separator [ref=e65]
+      - separator [ref=e70]
+      - heading "🔗 跨品种套利" [level=3] [ref=e74]
+      - generic [ref=e77] [cursor=pointer]:
+        - checkbox "启用双品种模式"
+        - paragraph [ref=e83]: 启用双品种模式
+      - separator [ref=e88]
+      - heading "⚙️ 设置" [level=3] [ref=e92]
+      - generic [ref=e95] [cursor=pointer]:
+        - checkbox "自动刷新"
+        - paragraph [ref=e101]: 自动刷新
+  - generic [ref=e104]:
+    - banner [ref=e105]:
+      - generic [ref=e108]:
+        - generic [ref=e110]:
+          - img "Running..." [ref=e111]:
+            - img [ref=e112]
+          - button "Stop" [ref=e117] [cursor=pointer]
+        - button "Main menu" [ref=e119] [cursor=pointer]:
+          - img [ref=e120]
+    - generic [ref=e125]:
+      - heading "📈 多周期共振分析" [level=3] [ref=e130]:
+        - text: 📈 多周期共振分析
+        - generic [ref=e131]:
+          - link "Link to heading":
+            - /url: "#9b42f304"
+            - img
+      - separator [ref=e136]
+      - paragraph [ref=e144]: 加载数据中...

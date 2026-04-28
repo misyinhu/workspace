@@ -1,0 +1,81 @@
+- generic [ref=e2]:
+  - generic [ref=e7]:
+    - button "keyboard_double_arrow_left" [ref=e430] [cursor=pointer]:
+      - generic [ref=e432]: keyboard_double_arrow_left
+    - list [ref=e10]:
+      - listitem [ref=e11]:
+        - link "app" [ref=e13] [cursor=pointer]:
+          - /url: http://localhost:8501/
+          - paragraph [ref=e16]: app
+      - listitem [ref=e17]:
+        - link "resonance" [ref=e19] [cursor=pointer]:
+          - /url: http://localhost:8501/resonance
+          - paragraph [ref=e22]: resonance
+      - listitem [ref=e23]:
+        - link "news center" [ref=e25] [cursor=pointer]:
+          - /url: http://localhost:8501/news_center
+          - paragraph [ref=e28]: news center
+      - listitem [ref=e29]:
+        - link "alerts" [ref=e31] [cursor=pointer]:
+          - /url: http://localhost:8501/alerts
+          - paragraph [ref=e34]: alerts
+    - generic [ref=e38]:
+      - heading "常用品种" [level=3] [ref=e42]
+      - generic [ref=e44]:
+        - paragraph [ref=e48]: 选择品种
+        - generic [ref=e50]:
+          - generic [ref=e51]:
+            - generic [ref=e52]: MNQ - E-mini Nasdaq 100
+            - combobox "Selected MNQ - E-mini Nasdaq 100. 选择品种" [active] [ref=e500]
+          - img "open" [ref=e56]
+      - generic [ref=e59]:
+        - paragraph [ref=e63]: 输入品种代码
+        - textbox "输入品种代码" [ref=e66]:
+          - /placeholder: "如: TSLA, AAPL, DOGEUSDT..."
+      - separator [ref=e71]
+      - heading "🔗 跨品种套利" [level=3] [ref=e75]
+      - generic [ref=e78] [cursor=pointer]:
+        - checkbox "启用双品种模式"
+        - paragraph [ref=e84]: 启用双品种模式
+      - separator [ref=e89]
+      - heading "⚙️ 设置" [level=3] [ref=e93]
+      - generic [ref=e111] [cursor=pointer]:
+        - checkbox "自动刷新"
+        - paragraph [ref=e117]: 自动刷新
+  - generic [ref=e3]:
+    - banner [ref=e120]:
+      - generic [ref=e123]:
+        - generic [ref=e501]:
+          - generic [ref=e503]: info
+          - generic [ref=e504]: File change.
+          - button "Rerun" [ref=e506] [cursor=pointer]:
+            - generic [ref=e507]: Rerun
+          - button "Always rerun" [ref=e509] [cursor=pointer]:
+            - generic [ref=e510]: Always rerun
+        - button "Main menu" [ref=e138] [cursor=pointer]:
+          - img [ref=e139]
+    - generic [ref=e142]:
+      - heading "📈 多周期共振分析" [level=3] [ref=e147]:
+        - text: 📈 多周期共振分析
+        - generic [ref=e148]:
+          - link "Link to heading":
+            - /url: "#9b42f304"
+            - img
+      - alert [ref=e512]:
+        - generic [ref=e515]:
+          - generic [ref=e516]: "ValueError: not enough values to unpack (expected 8, got 7)"
+          - generic [ref=e517]:
+            - generic [ref=e518]: "Traceback:"
+            - code [ref=e521]:
+              - generic [ref=e522]: File "/Users/wang/.opencode/workspace/trading/kanban/.venv/lib/python3.14/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 129, in exec_func_with_error_handling result = func()
+              - generic [ref=e523]: File "/Users/wang/.opencode/workspace/trading/kanban/.venv/lib/python3.14/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 687, in code_to_exec _mpa_v1(self._main_script_path) ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+              - generic [ref=e524]: File "/Users/wang/.opencode/workspace/trading/kanban/.venv/lib/python3.14/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 166, in _mpa_v1 page.run() ~~~~~~~~^^
+              - generic [ref=e525]: "File \"/Users/wang/.opencode/workspace/trading/kanban/.venv/lib/python3.14/site-packages/streamlit/navigation/page.py\", line 490, in run exec(code, module.__dict__) # noqa: S102 ~~~~^^^^^^^^^^^^^^^^^^^^^^^"
+              - generic [ref=e526]: File "/Users/wang/.opencode/workspace/trading/kanban/pages/01_resonance.py", line 588, in <module> main() ~~~~^^
+              - generic [ref=e527]: File "/Users/wang/.opencode/workspace/trading/kanban/pages/01_resonance.py", line 534, in main ( ^ ...<8 lines>... ) = render_sidebar() ^
+          - generic [ref=e528]:
+            - button "Copy" [ref=e529] [cursor=pointer]
+            - link "Ask Google" [ref=e530] [cursor=pointer]:
+              - /url: https://www.google.com/search?q=ValueError%3A%20not%20enough%20values%20to%20unpack%20(expected%208%2C%20got%207)
+            - link "Ask ChatGPT" [ref=e531] [cursor=pointer]:
+              - /url: https://chatgpt.com/?q=ValueError%3A%20not%20enough%20values%20to%20unpack%20(expected%208%2C%20got%207)%0A%0AFile%20%22%2FUsers%2Fwang%2F.opencode%2Fworkspace%2Ftrading%2Fkanban%2F.venv%2Flib%2Fpython3.14%2Fsite-packages%2Fstreamlit%2Fruntime%2Fscriptrunner%2Fexec_code.py%22%2C%20line%20129%2C%20in%20exec_func_with_error_handling%0A%20%20%20%20result%20%3D%20func()%0AFile%20%22%2FUsers%2Fwang%2F.opencode%2Fworkspace%2Ftrading%2Fkanban%2F.venv%2Flib%2Fpython3.14%2Fsite-packages%2Fstreamlit%2Fruntime%2Fscriptrunner%2Fscript_runner.py%22%2C%20line%20687%2C%20in%20code_to_exec%0A%20%20%20%20_mpa_v1(self._main_script_path)%0A%20%20%20%20~~~~~~~%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%0AFile%20%22%2FUsers%2Fwang%2F.opencode%2Fworkspace%2Ftrading%2Fkanban%2F.venv%2Flib%2Fpython3.14%2Fsite-packages%2Fstreamlit%2Fruntime%2Fscriptrunner%2Fscript_runner.py%22%2C%20line%20166%2C%20in%20_mpa_v1%0A%20%20%20%20page.run()%0A%20%20%20%20~~~~~~~~%5E%5E%0AFile%20%22%2FUsers%2Fwang%2F.opencode%2Fworkspace%2Ftrading%2Fkanban%2F.venv%2Flib%2Fpython3.14%2Fsite-packages%2Fstreamlit%2Fnavigation%2Fpage.py%22%2C%20line%20490%2C%20in%20run%0A%20%20%20%20exec(code%2C%20module.__dict__)%20%20%23%20noqa%3A%20S102%0A%20%20%20%20~~~~%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%5E%0AFile%20%22%2FUsers%2Fwang%2F.opencode%2Fworkspace%2Ftrading%2Fkanban%2Fpages%2F01_resonance.py%22%2C%20line%20588%2C%20in%20%3Cmodule%3E%0A%20%20%20%20main()%0A%20%20%20%20~~~~%5E%5E%0AFile%20%22%2FUsers%2Fwang%2F.opencode%2Fworkspace%2Ftrading%2Fkanban%2Fpages%2F01_resonance.py%22%2C%20line%20534%2C%20in%20main%0A%20%20%20%20(%0A%20%20%20%20%5E%0A%20%20%20%20...%3C8%20lines%3E...%0A%20%20%20%20)%20%3D%20render_sidebar()%0A%20%20%20%20%5E

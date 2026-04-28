@@ -50,32 +50,43 @@ def get_chart_targets():
     parts = text.split("\r\n\r\n", 1)
     body = parts[1].strip() if len(parts) > 1 else text.strip()
     targets = json.loads(body)
-    return [
-        t
-        for t in targets
-        if t.get("type") == "page" and "tradingview.com/chart" in t.get("url", "")
-    ]
+    result = []
+    for t in targets:
+        if t.get("type") == "page" and "tradingview.com/chart" in t.get("url", ""):
+            ws_url = t.get("webSocketDebuggerUrl", "")
+            if ws_url:
+                ws_url = ws_url.replace(
+                    "ws://127.0.0.1:9222/", f"ws://{TV_HOST}:{TV_PORT}/"
+                )
+                ws_url = ws_url.replace("ws://127.0.0.1/", f"ws://{TV_HOST}:{TV_PORT}/")
+                t["webSocketDebuggerUrl"] = ws_url
+            result.append(t)
+    return result
 
 
-def get_all_tv_indicators():
+def get_all_tv_indicators(timeframe="5"):
+    tf_map = {"1m": "1", "5m": "5", "15m": "15", "30m": "30", "1h": "60", "4h": "240"}
+    tf_code = tf_map.get(timeframe, "5")
+
     try:
         targets = get_chart_targets()
+        targets = list(reversed(targets))  # 反转以匹配 TV 窗口实际顺序
         if not targets:
-            return get_single_tab_data()
+            return get_single_tab_data(timeframe)
 
         results = []
         seen_symbols = set()
 
-        for target in targets:
+        for idx, target in enumerate(targets):
             ws_url = target.get("webSocketDebuggerUrl", "")
             if not ws_url:
                 continue
 
             result = subprocess.run(
-                ["node", MULTI_WINDOW_SCRIPT, ws_url],
+                ["node", MULTI_WINDOW_SCRIPT, ws_url, tf_code],
                 capture_output=True,
                 text=True,
-                timeout=15,
+                timeout=30,
                 cwd="/Users/wang/.opencode/workspace/tradingview-mcp",
             )
 
@@ -91,8 +102,10 @@ def get_all_tv_indicators():
                     results.append(
                         {
                             "symbol": symbol,
+                            "tab_index": idx,
                             "exchange": data.get("exchange", ""),
                             "description": data.get("description", ""),
+                            "timeframe": data.get("timeframe", tf_code),
                             "quote": data.get("quote", {}),
                             "studies": data.get("studies", []),
                         }
@@ -101,19 +114,24 @@ def get_all_tv_indicators():
                     pass
 
         if results:
-            return {"tabs": results, "tab_count": len(results), "mode": "multi_window"}
+            return {
+                "tabs": results,
+                "tab_count": len(results),
+                "mode": "multi_window",
+                "timeframe": timeframe,
+            }
 
-        return get_single_tab_data()
+        return get_single_tab_data(timeframe)
 
     except Exception as e:
         import traceback
 
         print(f"get_all_tv_indicators error: {e}")
         traceback.print_exc()
-        return get_single_tab_data()
+        return get_single_tab_data(timeframe)
 
 
-def get_single_tab_data():
+def get_single_tab_data(timeframe="5"):
     try:
         symbol_data = run_tv_cmd(["symbol"])
         quote_data = run_tv_cmd(["quote"])
@@ -125,6 +143,7 @@ def get_single_tab_data():
                 "symbol": symbol_data.get("symbol", "N/A"),
                 "description": symbol_data.get("description", ""),
                 "exchange": quote_data.get("exchange", "") if quote_data else "",
+                "timeframe": timeframe,
                 "quote": {
                     "open": quote_data.get("open") if quote_data else None,
                     "high": quote_data.get("high") if quote_data else None,
@@ -137,7 +156,7 @@ def get_single_tab_data():
                 "studies": values_data.get("studies", []) if values_data else [],
             }
         ]
-        return {"tabs": all_data, "tab_count": len(all_data)}
+        return {"tabs": all_data, "tab_count": len(all_data), "timeframe": timeframe}
     except Exception as e:
         print(f"get_single_tab_data error: {e}")
         return None

@@ -1,0 +1,81 @@
+- generic [ref=e2]:
+  - generic [ref=e7]:
+    - button "keyboard_double_arrow_left" [ref=e10] [cursor=pointer]:
+      - generic [ref=e12]: keyboard_double_arrow_left
+    - list [ref=e14]:
+      - listitem [ref=e15]:
+        - link "app" [ref=e17] [cursor=pointer]:
+          - /url: http://127.0.0.1:8502/
+          - generic [ref=e18]: app
+      - listitem [ref=e19]:
+        - link "news center" [ref=e21] [cursor=pointer]:
+          - /url: http://127.0.0.1:8502/news_center
+          - generic [ref=e22]: news center
+      - listitem [ref=e23]:
+        - link "resonance" [ref=e25] [cursor=pointer]:
+          - /url: http://127.0.0.1:8502/resonance
+          - generic [ref=e26]: resonance
+      - listitem [ref=e27]:
+        - link "alerts" [ref=e29] [cursor=pointer]:
+          - /url: http://127.0.0.1:8502/alerts
+          - generic [ref=e30]: alerts
+  - generic [ref=e3]:
+    - banner [ref=e34]:
+      - generic [ref=e37]:
+        - generic [ref=e39]:
+          - img "Running..." [ref=e40]:
+            - img [ref=e41]
+          - button "Stop" [ref=e46] [cursor=pointer]
+        - button "Deploy" [ref=e48] [cursor=pointer]:
+          - generic [ref=e50]: Deploy
+        - button [ref=e52] [cursor=pointer]:
+          - img [ref=e53]
+    - generic [ref=e56]:
+      - heading "📰 新闻事件中心" [level=3] [ref=e62]:
+        - text: 📰 新闻事件中心
+        - generic [ref=e63]:
+          - link "Link to heading":
+            - /url: "#8093e50e"
+            - img
+      - paragraph [ref=e68]: 实时财经新闻与社区情绪分析
+      - generic [ref=e70]:
+        - generic [ref=e74]:
+          - paragraph [ref=e78]: 开始日期
+          - textbox "Select a date." [ref=e82]:
+            - /placeholder: YYYY/MM/DD
+            - text: 2026/04/27
+          - paragraph: Press the down arrow key to interact with the calendar and select a date. Press the escape button to close the calendar.
+          - paragraph: Selected date is 2026/04/27. Select the second date.
+        - generic [ref=e86]:
+          - paragraph [ref=e90]: 结束日期
+          - textbox "Select a date." [ref=e94]:
+            - /placeholder: YYYY/MM/DD
+            - text: 2026/04/27
+          - paragraph: Press the down arrow key to interact with the calendar and select a date. Press the escape button to close the calendar.
+          - paragraph: Selected date is 2026/04/27. Select the second date.
+      - generic [ref=e96]:
+        - paragraph [ref=e100]: 分类
+        - generic [ref=e102]:
+          - generic [ref=e103]:
+            - generic [ref=e104]: 全部
+            - combobox "Selected 全部. 分类" [ref=e106]
+          - img "open" [ref=e108]
+      - generic [ref=e112]:
+        - paragraph [ref=e116]: 新闻数量
+        - generic [ref=e117]:
+          - slider "新闻数量" [ref=e121]:
+            - generic:
+              - generic:
+                - paragraph: "10"
+          - generic:
+            - generic:
+              - paragraph: "5"
+            - generic:
+              - paragraph: "30"
+      - generic [ref=e124]:
+        - tablist [ref=e126]:
+          - tab "📋 财经新闻" [selected] [ref=e127] [cursor=pointer]:
+            - paragraph [ref=e129]: 📋 财经新闻
+          - tab "💬 市场情绪" [ref=e130] [cursor=pointer]:
+            - paragraph [ref=e132]: 💬 市场情绪
+        - tabpanel "📋 财经新闻" [ref=e135]
