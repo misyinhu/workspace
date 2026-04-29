@@ -23,6 +23,7 @@ EXCHANGES = {
     "okx": "OKX (加密)",
     "sse": "上交所 (A股)",
     "szse": "深交所 (A股)",
+    "ib": "IB (芝商所/外盘)",
 }
 
 
@@ -128,12 +129,13 @@ def render_sidebar():
 
 
 def get_common_symbols() -> list:
-    """获取常用品种列表"""
+    """获取常用品种列表，格式: exchange:symbol 如 CME:MNQ"""
     instruments = load_instruments_config()
     symbols = []
     for inst in instruments:
         symbol = inst.get("symbol", "")
         source = inst.get("source", "")
+        exchange = inst.get("exchange", "").upper()
 
         if source == "okx":
             if symbol.endswith("-SWAP"):
@@ -141,25 +143,12 @@ def get_common_symbols() -> list:
             if "-" in symbol:
                 symbols.append(f"OKX:{symbol}")
         elif source == "ib":
-            exchange = inst.get("exchange", "").lower()
-            if exchange == "nasdaq":
-                symbols.append(f"OKX:{symbol}USDT")
-            elif exchange in ["cme", "nymex", "comex"]:
-                tv_symbol_map = {
-                    "MNQ": "MNQ",
-                    "MYM": "MYM",
-                    "RB": "RB",
-                    "HO": "HO",
-                    "MGC": "MGC",
-                    "MHG": "MHG",
-                }
-                tv_symbol = tv_symbol_map.get(symbol, symbol)
-                if exchange == "cme":
-                    symbols.append(f"{tv_symbol}.cme")
-                elif exchange in ["nymex", "nyex"]:
-                    symbols.append(f"{tv_symbol}.nyex")
-                elif exchange == "comex":
-                    symbols.append(f"{tv_symbol}.comex")
+            if exchange in ["CME", "NYMEX", "COMEX", "CBOT"]:
+                # IB 期货格式: CME:MNQ
+                symbols.append(f"{exchange}:{symbol}")
+            elif exchange == "NASDAQ":
+                # 美股格式: NASDAQ:AAPL
+                symbols.append(f"NASDAQ:{symbol}")
     return symbols
 
 
@@ -174,6 +163,8 @@ def call_market_scan_api(params: dict) -> dict:
             source = "okx"
         elif "sse" in exchanges or "szse" in exchanges:
             source = "tdxquant"
+        elif "ib" in exchanges:
+            source = "ib"
         else:
             source = "okx"
     else:

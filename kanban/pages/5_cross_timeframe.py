@@ -96,6 +96,29 @@ def render_cross_timeframe():
     st.markdown("### 📊 跨周期分析")
     st.caption("自动获取 H1 / M15 / M3 指标，评估多周期共振信号")
 
+    legend_markdown = """
+    **🎯 评分标准**
+    | 评分 | 条件 | 信号 |
+    |:---:|------|------|
+    | **+2** | Z全部同向(≥2) + 相关性破裂(<0.3) | 🟢买入/🔴卖出 |
+    | **+1** | Z偏离(≥2) + 相关性破裂 | 🟡关注 |
+    | **+1** | 相关性破裂但Z未极端 | 🟡关注 |
+    | **0** | Z共振但无相关性破裂 | ⚪无效 |
+
+    **🔥 强烈入场**: 评分≥2 + Z全部≥3 + 相关性全部<-0.5  
+    **关键**: 相关性破裂(<0.3)是买入卖出信号的必要条件
+
+    **🎨 单元格颜色**
+    | Z-Score | 颜色 | 相关性 | 颜色 |
+    |:---:|:---:|------|:---:|
+    | &#124;Z&#124; ≥ 3 | 🔴红底白字 | corr < -0.5 | 🔴红底白字 |
+    | &#124;Z&#124; ≥ 2 | 🟡黄底黑字 | corr < 0 | 🟡黄底黑字 |
+    评分≥2的行：淡红背景高亮
+    """
+
+    st.markdown("#### 📋 图例说明")
+    st.markdown(legend_markdown)
+
     if st.button("🔄 开始跨周期扫描", type="primary"):
         st.rerun()
 
@@ -131,35 +154,6 @@ def render_cross_timeframe():
     if not symbol_map:
         st.warning("⚠️ 未扫描到任何图表")
         return
-    st.markdown("#### 📋 图例说明")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("**🎯 评分标准**")
-        st.markdown("""
-        | 评分 | 条件 | 信号 |
-        |:---:|------|------|
-        | **+2** | Z全部同向(≥2) + 相关性破裂(<0.3) | 🟢买入/🔴卖出 |
-        | **+1** | Z偏离(≥2) + 相关性破裂 | 🟡关注 |
-        | **+1** | 相关性破裂但Z未极端 | 🟡关注 |
-        | **0** | Z共振但无相关性破裂 | ⚪无效 |
-        """)
-        st.markdown("""
-        **🔥 强烈入场**: 评分≥2 + Z全部≥3 + 相关性全部<-0.5  
-        **关键**: 相关性破裂(<0.3)是买入卖出信号的必要条件
-        """)
-
-    with col2:
-        st.markdown("**🎨 单元格颜色**")
-        st.markdown("""
-        | Z-Score | 颜色 | 相关性 | 颜色 |
-        |:---:|:---:|------|:---:|
-        | \|Z\| ≥ 3 | 🔴红底白字 | corr < -0.5 | 🔴红底白字 |
-        | \|Z\| ≥ 2 | 🟡黄底黑字 | corr < 0 | 🟡黄底黑字 |
-        """)
-        st.markdown("评分≥2的行：淡红背景高亮")
-
     st.markdown("---")
 
     st.markdown(f"#### 📈 多周期信号矩阵 ({len(symbol_map)} 个品种)")
@@ -206,18 +200,18 @@ def render_cross_timeframe():
         if val is None:
             return None
         try:
-            s = str(val).strip()
+            s = str(val).strip().replace("−", "-").replace("−", "-")
+            digits = ""
             for i, c in enumerate(s):
-                if c == "-" and i > 0:
-                    continue
-                if c == "." or c.isdigit():
-                    continue
-                return float(s[:i]) if i > 0 else None
-            return float(s)
+                if c in "0123456789.-":
+                    digits += c
+                elif digits:
+                    break
+            return float(digits) if digits else None
         except:
             return None
 
-    def style_zscore(val):
+    def style_zscore_raw(val):
         z = parse_formatted(val)
         if z is None:
             return ""
@@ -227,7 +221,7 @@ def render_cross_timeframe():
             return "background-color: #ffeb3b; color: black; font-weight: bold"
         return ""
 
-    def style_corr(val):
+    def style_corr_raw(val):
         c = parse_formatted(val)
         if c is None:
             return ""
@@ -237,12 +231,7 @@ def render_cross_timeframe():
             return "background-color: #ffeb3b; color: black"
         return ""
 
-    def style_row(row):
-        score = row.get("评分", 0)
-        if score >= 2:
-            return ["background-color: #ffe0e0"] * len(row)
-        return [""] * len(row)
-
+    # 格式化函数（应用于显示）
     def format_zscore(val):
         z = parse_float(val)
         if z is None:
@@ -284,28 +273,33 @@ def render_cross_timeframe():
 
     display_df = df_display[display_cols].copy()
 
-    def style_all(row):
+    zscore_cols = ["H1 Z", "M15 Z", "M3 Z"]
+    corr_cols = ["H1相关", "M15相关", "M3相关"]
+
+    def style_cell(row):
+        row_idx = row.name
+        score = df.iloc[row_idx]["评分"]
+        is_high_score = score >= 2
         styles = ["" for _ in row]
-        score_idx = display_cols.index("评分")
-        if row[score_idx] >= 2:
+        for col in zscore_cols:
+            val = df.iloc[row_idx][col]
+            styles[display_cols.index(col)] = style_zscore_raw(val)
+        for col in corr_cols:
+            val = df.iloc[row_idx][col]
+            styles[display_cols.index(col)] = style_corr_raw(val)
+        if is_high_score:
             for i in range(len(row)):
-                styles[i] = "background-color: #ffe0e0"
+                if not styles[i]:
+                    styles[i] = "background-color: #ffe0e0"
+                elif "background-color" not in styles[i]:
+                    styles[i] += "; background-color: #ffe0e0"
         return styles
 
-    styled = display_df.style
-
-    for col in ["H1 Z", "M15 Z", "M3 Z"]:
-        styled = styled.map(lambda x: style_zscore(x), subset=[col])
-
-    for col in ["H1相关", "M15相关", "M3相关"]:
-        styled = styled.map(lambda x: style_corr(x), subset=[col])
-
-    styled = styled.apply(style_all, axis=1)
+    styled = display_df.style.apply(style_cell, axis=1)
 
     st.dataframe(styled, use_container_width=True, hide_index=True)
 
     st.markdown("---")
-
 
     if st.button("🔄 重新扫描"):
         st.rerun()
