@@ -15,6 +15,7 @@ EXCHANGES = {
     "okx": "OKX (加密)",
     "sse": "上交所 (A股)",
     "szse": "深交所 (A股)",
+    "ib": "IB (芝商所/外盘)",
 }
 
 
@@ -63,7 +64,7 @@ def render_sidebar():
 
 
 def get_symbols_for_scan(use_common: bool, exchanges: list) -> list:
-    """获取扫描品种列表"""
+    """获取扫描品种列表，格式: exchange:symbol 如 CME:MNQ"""
     symbols = []
 
     # 常用品种
@@ -72,41 +73,18 @@ def get_symbols_for_scan(use_common: bool, exchanges: list) -> list:
         for inst in instruments:
             symbol = inst.get("symbol", "")
             source = inst.get("source", "")
-            exchange = inst.get("exchange", "").lower()
+            exchange = inst.get("exchange", "").upper()
 
-            # 转换 symbol 格式以匹配 OKX API
             if source == "okx":
-                # OKX 格式: BTC-USDT-SWAP -> BTC-USDT
                 if symbol.endswith("-SWAP"):
                     symbol = symbol.replace("-SWAP", "")
-                # 如果已经是 BTC-USDT 格式，直接用
                 if "-" in symbol:
-                    symbols.append(symbol)
+                    symbols.append(f"OKX:{symbol}")
             elif source == "ib":
-                # IB 品种需要转换格式
-                if exchange == "nasdaq":
-                    symbols.append(f"OKX:{symbol}USDT")
-                elif exchange in ["cme", "nymex", "comex"]:
-                    # 期货品种
-                    tv_symbol = {
-                        "MNQ": "MNQ",
-                        "MYM": "MYM",
-                        "RB": "RB",
-                        "HO": "HO",
-                        "MGC": "MGC",
-                        "MHG": "MHG",
-                    }.get(symbol, symbol)
-                    # TradingView 格式
-                    if exchange == "cme":
-                        symbols.append(f"{tv_symbol}.cme")
-                    elif exchange in ["nymex", "nyex"]:
-                        symbols.append(f"{tv_symbol}.nyex")
-                    elif exchange == "comex":
-                        symbols.append(f"{tv_symbol}.comex")
-
-    # 交易所品种 - 后端 load_symbols 加载，这里不硬编码
-    for exchange in exchanges:
-        pass  # 后端从 exchanges 加载完整列表
+                if exchange in ["CME", "NYMEX", "COMEX", "CBOT"]:
+                    symbols.append(f"{exchange}:{symbol}")
+                elif exchange == "NASDAQ":
+                    symbols.append(f"NASDAQ:{symbol}")
 
     return symbols
 
@@ -199,8 +177,65 @@ def call_three_screen_api(
         return {"error": str(e), "http_status": None}
 
 
+def _create_result_df(results: list, trend_filter: str = None) -> pd.DataFrame:
+    """创建结果 DataFrame，统一格式"""
+    if not results:
+        return pd.DataFrame()
+
+    rows = []
+    for r in results:
+        if trend_filter and r.get("trend") != trend_filter:
+            continue
+        rows.append(
+            {
+                "品种": r.get("symbol", ""),
+                "趋势": r.get("trend", "-"),
+                "回调": "✓" if r.get("pullback") else "-",
+                "回调原因": r.get("pullback_reason", "-") or "-",
+                "M1信号": r.get("entry", "-"),
+                "强度": r.get("strength", 0),
+                "支撑": f"{r.get('support', 0):.2f}" if r.get("support") else "-",
+                "压力": f"{r.get('resistance', 0):.2f}" if r.get("resistance") else "-",
+                "入场价": f"{r.get('entry_price', 0):.4f}"
+                if r.get("entry_price")
+                else "-",
+                "止损": f"{r.get('stop_loss', 0):.4f}" if r.get("stop_loss") else "-",
+                "盈亏比": f"{r.get('risk_reward', 0):.2f}"
+                if r.get("risk_reward")
+                else "-",
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _render_signal_table(df: pd.DataFrame, title: str, color: str):
+    """渲染信号表格"""
+    if df.empty:
+        st.warning(f"{title} - 无数据")
+        return
+
+    st.subheader(f"{color} {title} ({len(df)} 个)")
+
+    col_config = {
+        "品种": st.column_config.TextColumn("品种", width="medium"),
+        "趋势": st.column_config.TextColumn("趋势", width="small"),
+        "回调": st.column_config.TextColumn("回调", width="small"),
+        "回调原因": st.column_config.TextColumn("回调原因", width="large"),
+        "M1信号": st.column_config.TextColumn("M1信号", width="small"),
+        "强度": st.column_config.NumberColumn("强度", format="%d", width="small"),
+        "支撑": st.column_config.TextColumn("支撑", width="small"),
+        "压力": st.column_config.TextColumn("压力", width="small"),
+        "入场价": st.column_config.TextColumn("入场", width="small"),
+        "止损": st.column_config.TextColumn("止损", width="small"),
+        "盈亏比": st.column_config.TextColumn("盈亏比", width="small"),
+    }
+    st.dataframe(
+        df, column_config=col_config, hide_index=True, use_container_width=True
+    )
+
+
 def render_results(result: dict):
-    """渲染三滤网扫描结果"""
+    """渲染三滤网扫描结果 - 分类展示有信号和无信号品种"""
     bulls = result.get("bulls_with_pullback", [])
     bears = result.get("bears_with_pullback", [])
     all_results = result.get("all_results", [])
@@ -209,109 +244,72 @@ def render_results(result: dict):
         st.warning("未发现符合条件的标的")
         return
 
-    # 多头机会
-    if bulls:
-        st.subheader(f"🟢 做多机会 ({len(bulls)} 个)")
+    # === 有信号品种 ===
+    st.markdown("## 📊 有信号品种")
 
-        bull_df = pd.DataFrame(
-            [
-                {
-                    "品种": r.get("symbol", ""),
-                    "趋势": r.get("trend", "-"),
-                    "回调": "✓" if r.get("pullback") else "-",
-                    "回调原因": r.get("pullback_reason", "-"),
-                    "M1信号": r.get("entry", "-"),
-                    "强度": r.get("strength", 0),
-                    "支撑": f"{r.get('support', 0):.2f}" if r.get("support") else "-",
-                    "压力": f"{r.get('resistance', 0):.2f}"
-                    if r.get("resistance")
-                    else "-",
-                    "入场价": f"{r.get('entry_price', 0):.4f}"
-                    if r.get("entry_price")
-                    else "-",
-                    "止损": f"{r.get('stop_loss', 0):.4f}"
-                    if r.get("stop_loss")
-                    else "-",
-                    "盈亏比": f"{r.get('risk_reward', 0):.2f}"
-                    if r.get("risk_reward")
-                    else "-",
-                }
-                for r in bulls
-            ]
-        )
+    bull_df = _create_result_df(all_results, "bull")
+    bear_df = _create_result_df(all_results, "bear")
+
+    # 按强度排序
+    if not bull_df.empty:
         bull_df = bull_df.sort_values("强度", ascending=False)
-
-        bull_col_config = {
-            "品种": st.column_config.TextColumn("品种", width="medium"),
-            "趋势": st.column_config.TextColumn("趋势", width="small"),
-            "回调": st.column_config.TextColumn("回调", width="small"),
-            "回调原因": st.column_config.TextColumn("回调原因", width="large"),
-            "M1信号": st.column_config.TextColumn("M1信号", width="small"),
-            "强度": st.column_config.NumberColumn("强度", format="%d", width="small"),
-            "支撑": st.column_config.TextColumn("支撑", width="small"),
-            "压力": st.column_config.TextColumn("压力", width="small"),
-            "入场价": st.column_config.TextColumn("入场", width="small"),
-            "止损": st.column_config.TextColumn("止损", width="small"),
-            "盈亏比": st.column_config.TextColumn("盈亏比", width="small"),
-        }
-        st.dataframe(
-            bull_df,
-            column_config=bull_col_config,
-            hide_index=True,
-            use_container_width=True,
-        )
-
-    # 空头机会
-    if bears:
-        st.subheader(f"🔴 做空机会 ({len(bears)} 个)")
-
-        bear_df = pd.DataFrame(
-            [
-                {
-                    "品种": r.get("symbol", ""),
-                    "趋势": r.get("trend", "-"),
-                    "回调": "✓" if r.get("pullback") else "-",
-                    "回调原因": r.get("pullback_reason", "-"),
-                    "M1信号": r.get("entry", "-"),
-                    "强度": r.get("strength", 0),
-                    "支撑": f"{r.get('support', 0):.2f}" if r.get("support") else "-",
-                    "压力": f"{r.get('resistance', 0):.2f}"
-                    if r.get("resistance")
-                    else "-",
-                    "入场价": f"{r.get('entry_price', 0):.4f}"
-                    if r.get("entry_price")
-                    else "-",
-                    "止损": f"{r.get('stop_loss', 0):.4f}"
-                    if r.get("stop_loss")
-                    else "-",
-                    "盈亏比": f"{r.get('risk_reward', 0):.2f}"
-                    if r.get("risk_reward")
-                    else "-",
-                }
-                for r in bears
-            ]
-        )
+    if not bear_df.empty:
         bear_df = bear_df.sort_values("强度", ascending=False)
 
-        bear_col_config = {
-            "品种": st.column_config.TextColumn("品种", width="medium"),
-            "趋势": st.column_config.TextColumn("趋势", width="small"),
-            "回调": st.column_config.TextColumn("回调", width="small"),
-            "回调原因": st.column_config.TextColumn("回调原因", width="large"),
+    col1, col2 = st.columns(2)
+    with col1:
+        _render_signal_table(bull_df, "🟢 做多机会 (M30多头+回调)", "🟢")
+    with col2:
+        _render_signal_table(bear_df, "🔴 做空机会 (M30空头+回调)", "🔴")
+
+    # === 无信号品种 ===
+    st.markdown("---")
+    st.markdown("## 📋 无信号品种 (已扫描但无触发条件)")
+
+    # 获取所有无信号的标的 - 排除 bulls 和 bears
+    bull_symbols = {r["symbol"] for r in bulls}
+    bear_symbols = {r["symbol"] for r in bears}
+
+    no_signal = [
+        r
+        for r in all_results
+        if r["symbol"] not in bull_symbols and r["symbol"] not in bear_symbols
+    ]
+
+    if no_signal:
+        no_signal_df = pd.DataFrame(
+            [
+                {
+                    "品种": r.get("symbol", ""),
+                    "M30趋势": r.get("trend", "-"),
+                    "M5回调": "✓" if r.get("pullback") else "-",
+                    "M1信号": r.get("entry", "-"),
+                    "强度": r.get("strength", 0),
+                    "原因": r.get("pullback_reason", "-") or "-",
+                }
+                for r in no_signal
+            ]
+        )
+        no_signal_df = no_signal_df.sort_values("M30趋势")
+
+        col_config = {
+            "品种": st.column_config.TextColumn("品种", width="small"),
+            "M30趋势": st.column_config.TextColumn("M30趋势", width="small"),
+            "M5回调": st.column_config.TextColumn("M5回调", width="small"),
             "M1信号": st.column_config.TextColumn("M1信号", width="small"),
             "强度": st.column_config.NumberColumn("强度", format="%d", width="small"),
-            "支撑": st.column_config.TextColumn("支撑", width="small"),
-            "压力": st.column_config.TextColumn("压力", width="small"),
-            "入场价": st.column_config.TextColumn("入场", width="small"),
-            "止损": st.column_config.TextColumn("止损", width="small"),
-            "盈亏比": st.column_config.TextColumn("盈亏比", width="small"),
+            "原因": st.column_config.TextColumn("未触发原因", width="large"),
         }
         st.dataframe(
-            bear_df,
-            column_config=bear_col_config,
+            no_signal_df,
+            column_config=col_config,
             hide_index=True,
             use_container_width=True,
         )
+
+        st.caption(f"共 {len(no_signal)} 个品种无信号 (M30趋势不符合或无回调)")
+    else:
+        st.info("所有扫描品种均有信号触发")
 
 
 def main():
