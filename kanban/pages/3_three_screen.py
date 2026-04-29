@@ -208,10 +208,10 @@ def _create_result_df(results: list, trend_filter: str = None) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _render_signal_table(df: pd.DataFrame, title: str, color: str):
+def _render_signal_table(df: pd.DataFrame, title: str):
     """渲染信号表格"""
     if df.empty:
-        st.warning(f"{title} - 无数据")
+        st.caption(f"暂无 {title}")
         return
 
     st.subheader(f"{color} {title} ({len(df)} 个)")
@@ -258,9 +258,9 @@ def render_results(result: dict):
 
     col1, col2 = st.columns(2)
     with col1:
-        _render_signal_table(bull_df, "🟢 做多机会 (M30多头+回调)", "🟢")
+        _render_signal_table(bull_df, "做多机会 (M30多头+回调)")
     with col2:
-        _render_signal_table(bear_df, "🔴 做空机会 (M30空头+回调)", "🔴")
+        _render_signal_table(bear_df, "做空机会 (M30空头+回调)")
 
     # === 无信号品种 ===
     st.markdown("---")
