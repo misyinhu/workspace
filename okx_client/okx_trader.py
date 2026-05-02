@@ -7,9 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 import yaml
-from okx.Account import AccountAPI
-from okx.Trade import TradeAPI
-from okx.MarketData import MarketAPI
+from okx import Account, Trade, MarketData
 
 
 def _load_config():
@@ -51,9 +49,13 @@ class OKXTrader:
         if not all([self.api_key, self.secret, self.passphrase]):
             raise ValueError(f"OKX 密钥未配置 (flag={flag})")
 
-        self.account = AccountAPI(self.api_key, self.secret, self.passphrase, self.flag)
-        self.trade = TradeAPI(self.api_key, self.secret, self.passphrase, self.flag)
-        self.market = MarketAPI()
+        self.account = Account.AccountAPI(
+            self.api_key, self.secret, self.passphrase, self.flag
+        )
+        self.trade = Trade.TradeAPI(
+            self.api_key, self.secret, self.passphrase, self.flag
+        )
+        self.market = MarketData.MarketAPI()
 
     def set_leverage(self, inst_id: str, leverage: str, tdMode: str = "cross"):
         self.account.set_leverage(instId=inst_id, lever=leverage, mgnMode=tdMode)
