@@ -7,11 +7,16 @@ from pathlib import Path
 from typing import Optional
 
 import yaml
-from okx import Account, Trade, MarketData
+from okx.Account import AccountAPI
+from okx.Trade import TradeAPI
+from okx.MarketData import MarketAPI
 
 
 def _load_config():
-    for p in [Path(__file__).parent / "config.yaml", Path(__file__).parent.parent / "config" / "okx.yaml"]:
+    for p in [
+        Path(__file__).parent / "config.yaml",
+        Path(__file__).parent.parent / "config" / "okx.yaml",
+    ]:
         if p.exists():
             with open(p, encoding="utf-8") as f:
                 return yaml.safe_load(f)
@@ -46,9 +51,9 @@ class OKXTrader:
         if not all([self.api_key, self.secret, self.passphrase]):
             raise ValueError(f"OKX 密钥未配置 (flag={flag})")
 
-        self.account = Account.AccountAPI(self.api_key, self.secret, self.passphrase, self.flag)
-        self.trade = Trade.TradeAPI(self.api_key, self.secret, self.passphrase, self.flag)
-        self.market = MarketData.MarketAPI()
+        self.account = AccountAPI(self.api_key, self.secret, self.passphrase, self.flag)
+        self.trade = TradeAPI(self.api_key, self.secret, self.passphrase, self.flag)
+        self.market = MarketAPI()
 
     def set_leverage(self, inst_id: str, leverage: str, tdMode: str = "cross"):
         self.account.set_leverage(instId=inst_id, lever=leverage, mgnMode=tdMode)
@@ -58,56 +63,57 @@ class OKXTrader:
 
     def get_ticker(self, inst_id: str):
         return self.market.get_ticker(instId=inst_id)
-    
+
     def get_kline(self, inst_id: str, bar: str = "1h", limit: int = 100):
         return self.market.get_candlesticks(instId=inst_id, bar=bar, limit=str(limit))
-    
-    def get_history_kline(self, inst_id: str, bar: str = "1m", limit: int = 100, after: Optional[str] = None, before: Optional[str] = None):
+
+    def get_history_kline(
+        self,
+        inst_id: str,
+        bar: str = "1m",
+        limit: int = 100,
+        after: Optional[str] = None,
+        before: Optional[str] = None,
+    ):
         """获取历史K线 (2天前~3个月)"""
         return self.market.get_history_candlesticks(
-            instId=inst_id,
-            bar=bar,
-            limit=str(limit),
-            after=after,
-            before=before
+            instId=inst_id, bar=bar, limit=str(limit), after=after, before=before
         )
-    
+
     def get_ohlc(self, inst_id: str, bar: str = "1m", limit: int = 100):
         """获取OHLC数据 [时间, 开盘, 最高, 最低, 收盘, 量]"""
         data = self.get_kline(inst_id, bar=bar, limit=limit)
         if data.get("code") == "0" and data.get("data"):
             return [
                 {
-                    'time': int(c[0]),
-                    'open': float(c[1]),
-                    'high': float(c[2]),
-                    'low': float(c[3]),
-                    'close': float(c[4]),
-                    'vol': float(c[5])
+                    "time": int(c[0]),
+                    "open": float(c[1]),
+                    "high": float(c[2]),
+                    "low": float(c[3]),
+                    "close": float(c[4]),
+                    "vol": float(c[5]),
                 }
                 for c in data["data"]
             ]
         return []
-    
-    def calculate_atr(self, inst_id: str, period: int = 14, bar: str = "1h") -> Optional[float]:
+
+    def calculate_atr(
+        self, inst_id: str, period: int = 14, bar: str = "1h"
+    ) -> Optional[float]:
         """计算ATR (Average True Range)"""
         ohlc = self.get_ohlc(inst_id, bar=bar, limit=period + 1)
         if len(ohlc) < period + 1:
             return None
-        
+
         tr_values = []
         for i in range(1, len(ohlc)):
-            high = ohlc[i]['high']
-            low = ohlc[i]['low']
-            prev_close = ohlc[i-1]['close']
-            
-            tr = max(
-                high - low,
-                abs(high - prev_close),
-                abs(low - prev_close)
-            )
+            high = ohlc[i]["high"]
+            low = ohlc[i]["low"]
+            prev_close = ohlc[i - 1]["close"]
+
+            tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
             tr_values.append(tr)
-        
+
         return sum(tr_values) / len(tr_values)
 
     def place_order(
@@ -130,7 +136,9 @@ class OKXTrader:
             params["posSide"] = posSide
         return self.trade.place_order(**params)
 
-    def calc_quantity_from_usd(self, inst_id: str, usd_amount: float, leverage: int = 1) -> float:
+    def calc_quantity_from_usd(
+        self, inst_id: str, usd_amount: float, leverage: int = 1
+    ) -> float:
         ticker = self.get_ticker(inst_id)
         if ticker.get("code") != "0" or not ticker.get("data"):
             raise ValueError(f"获取 {inst_id} 价格失败: {ticker}")
