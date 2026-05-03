@@ -7,9 +7,22 @@ from pathlib import Path
 from typing import Optional
 
 import yaml
-from okx.Account import AccountAPI
-from okx.Trade import TradeAPI
-from okx.MarketData import MarketAPI
+import okx
+
+_version = getattr(okx, "__version__", "unknown")
+
+if _version.startswith("2."):
+    from okx.Account import AccountAPI
+    from okx.Trade import TradeAPI
+    from okx.MarketData import MarketAPI
+else:
+    from okx.account import Account
+    from okx.trade import Trade
+    from okx.market import Market
+
+    AccountAPI = Account
+    TradeAPI = Trade
+    MarketAPI = Market
 
 
 def _load_config():
@@ -51,15 +64,27 @@ class OKXTrader:
         if not all([self.api_key, self.secret, self.passphrase]):
             raise ValueError(f"OKX 密钥未配置 (flag={flag})")
 
-        self.account = AccountAPI(self.api_key, self.secret, self.passphrase, self.flag)
-        self.trade = TradeAPI(self.api_key, self.secret, self.passphrase, self.flag)
-        self.market = MarketAPI()
+        # 代理配置（OKX SDK 不读环境变量，必须显式传入）
+        proxy_url = os.environ.get('HTTPS_PROXY') or os.environ.get('HTTP_PROXY') or ''
+        if proxy_url:
+            # 去掉协议前缀，统一用 HTTP 代理格式
+            clean = proxy_url.replace('http://', '').replace('https://', '').rstrip('/')
+            proxies = {
+                'http': f'http://{clean}',
+                'https': f'http://{clean}',
+            }
+        else:
+            proxies = {}
+
+        self.account = AccountAPI(self.api_key, self.secret, self.passphrase, self.flag, proxies=proxies)
+        self.trade = TradeAPI(self.api_key, self.secret, self.passphrase, self.flag, proxies=proxies)
+        self.market = MarketAPI(proxies=proxies)
 
     def set_leverage(self, inst_id: str, leverage: str, tdMode: str = "cross"):
         self.account.set_leverage(instId=inst_id, lever=leverage, mgnMode=tdMode)
 
     def get_balance(self):
-        return self.account.get_account_balance()
+        return self.account.get_balance()
 
     def get_ticker(self, inst_id: str):
         return self.market.get_ticker(instId=inst_id)
@@ -134,7 +159,7 @@ class OKXTrader:
         }
         if posSide:
             params["posSide"] = posSide
-        return self.trade.place_order(**params)
+        return self.trade.set_order(**params)
 
     def calc_quantity_from_usd(
         self, inst_id: str, usd_amount: float, leverage: int = 1
@@ -154,7 +179,7 @@ class OKXTrader:
         return contracts
 
     def cancel_order(self, inst_id: str, ord_id: str):
-        return self.trade.cancel_order(instId=inst_id, ordId=ord_id)
+        return self.trade.set_cancel_order(instId=inst_id, ordId=ord_id)
 
 
 def get_client() -> "OKXTrader":

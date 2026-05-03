@@ -7,6 +7,10 @@ TradingView Webhook -> 飞书 中转服务
 import os
 import sys
 
+# 设置代理（必须在OKX SDK导入之前）
+os.environ['HTTP_PROXY'] = 'http://127.0.0.1:7890'
+os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:7890'
+
 # 首先应用 nest_asyncio patch（必须在导入 ib_insync 之前）
 try:
     from ib_insync.util import patchAsyncio
@@ -888,6 +892,49 @@ def _submit_okx_order(
         return {"error": f"OKX 下单失败: {e}"}
 
 
+def _submit_pair_trade(
+    symbols: list,
+    actions: list = None,
+    usd_amount: float = None,
+    leverage: int = 3,
+    margin_mode: str = "cross",
+    order_type: str = "market",
+):
+    """同时下单多个标的（配对交易）"""
+    from concurrent.futures import ThreadPoolExecutor
+    
+    # 如果没有传入 actions，默认全部用 BUY
+    if actions is None:
+        actions = ["BUY"] * len(symbols)
+    
+    results = []
+    errors = []
+    
+    def _trade_one(symbol, action):
+        try:
+            result = _submit_okx_order(
+                symbol=symbol,
+                action=action,
+                quantity=0,  # 通过 usd_amount 计算
+                usd_amount=usd_amount,
+                leverage=leverage,
+                margin_mode=margin_mode,
+                order_type=order_type,
+            )
+            return {symbol: result}
+        except Exception as e:
+            return {symbol: {"error": str(e)}}
+    
+    # 并发执行所有订单
+    with ThreadPoolExecutor(max_workers=len(symbols)) as executor:
+        futures = [executor.submit(_trade_one, sym, act) for sym, act in zip(symbols, actions)]
+        for future in futures:
+            result = future.result()
+            results.append(result)
+    
+    return {"pair_trade": results}
+
+
 @app.route("/tv-webhook", methods=["POST"])
 def tv_webhook():
     try:
@@ -908,10 +955,44 @@ def tv_webhook():
             order_type = data.get(
                 "order_type", "market" if exchange == "OKX" else "MKT"
             )
-
+            
+            # 支持配对交易：symbols 数组
+            symbols = data.get("symbols", [])
+            # 支持 actions 数组：每个标的独立方向
+            actions = data.get("actions", [action] * len(symbols) if symbols else [])
+            
             if exchange == "OKX":
                 from datetime import datetime
 
+                time_str = datetime.now().strftime("%H:%M:%S")
+                
+                # 配对交易模式
+                if symbols and len(symbols) > 1:
+                    # 构建方向描述
+                    dir_parts = []
+                    for sym, act in zip(symbols, actions):
+                        act_cn = "买入" if act == "BUY" else "卖出"
+                        dir_parts.append(f"{sym}: {act_cn}")
+                    dir_str = " | ".join(dir_parts)
+                    leverage_info = f" {leverage if leverage else 3}x杠杆" if leverage else "3x杠杆"
+                    submit_msg = f"⏳ OKX 配对交易提交中\n{dir_str}\n杠杆: {leverage_info}\n模式: {margin_mode}\n时间: {time_str}"
+                    send_feishu(submit_msg)
+                    
+                    result = _submit_pair_trade(
+                        symbols=symbols,
+                        actions=actions,
+                        usd_amount=usd_amount,
+                        leverage=leverage if leverage else 3,
+                        margin_mode=margin_mode,
+                        order_type=order_type,
+                    )
+                    
+                    output_str = str(result)[:500] if result else ""
+                    msg = f"🤖 OKX 配对交易信号\n{dir_str}\n保证金: {usd_amount} USD\n\n结果: {output_str}"
+                    send_feishu(msg)
+                    return jsonify({"status": "ok", "order": result})
+                
+                # 单标的下单
                 time_str = datetime.now().strftime("%H:%M:%S")
                 action_cn = "买入" if action == "BUY" else "卖出"
                 leverage_info = f" {leverage}x杠杆" if leverage else ""
