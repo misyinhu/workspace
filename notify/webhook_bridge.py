@@ -825,6 +825,173 @@ def calculate_ma(prices: list, period: int) -> float:
     return sum(prices[-period:]) / period
 
 
+def _parse_tv_float(val, default=None):
+    """解析 TradingView 格式化的数字（如 \"1.29\" 或 \"−0.52\"）"""
+    if val is None:
+        return default
+    try:
+        return float(str(val).replace("−", "-").replace("−", "-"))
+    except:
+        return default
+
+
+def _get_zscore_color(z):
+    """根据 Z-Score 值返回颜色标注"""
+    if z is None:
+        return ""
+    if abs(z) >= 3:
+        return "🔴"
+    elif abs(z) >= 2:
+        return "🟡"
+    return ""
+
+
+def _get_corr_color(corr):
+    """根据相关性值返回颜色标注"""
+    if corr is None:
+        return ""
+    if corr < -0.5:
+        return "🔴"
+    elif corr < 0:
+        return "🟡"
+    return ""
+
+
+def _extract_tv_indicators(studies):
+    """从 TradingView studies 中提取指标值"""
+    result = {}
+    for study in studies:
+        name = study.get("name", "")
+        if name == "Overlay":
+            continue
+        values = study.get("values", {})
+        for k, v in values.items():
+            result[k] = v
+    return result
+
+
+def _format_tv_symbol_report(symbol, data_map):
+    """格式化单个品种的 TV 跨周期报告
+
+    Args:
+        symbol: 品种代码
+        data_map: dict，key 为 timeframe (30m/5m/1m)，value 为包含 quote 和 indicators 的 dict
+
+    Returns:
+        格式化报告字符串
+    """
+    # 获取价格（优先使用 M30）
+    price = (
+        data_map.get("30m", {}).get("quote", {}).get("close")
+        or data_map.get("5m", {}).get("quote", {}).get("close")
+        or data_map.get("1m", {}).get("quote", {}).get("close")
+    )
+    price_str = f"{price:.4f}" if price else "N/A"
+
+    lines = [f"━━━ {symbol} ━━━", f"💰 价格: {price_str}", ""]
+
+    # 按时间周期显示数据
+    for tf in ["30m", "5m", "1m"]:
+        tf_data = data_map.get(tf, {})
+        indicators = tf_data.get("indicators", {})
+
+        zscore = _parse_tv_float(indicators.get("Z-Score"))
+        long_corr = _parse_tv_float(indicators.get("长期相关性"))
+        short_corr = _parse_tv_float(indicators.get("短期相关性"))
+
+        z_color = _get_zscore_color(zscore)
+        lc_color = _get_corr_color(long_corr)
+        sc_color = _get_corr_color(short_corr)
+
+        z_str = f"{zscore:.2f}" if zscore is not None else "N/A"
+        lc_str = f"{long_corr:.2f}" if long_corr is not None else "N/A"
+        sc_str = f"{short_corr:.2f}" if short_corr is not None else "N/A"
+
+        z_display = f"{z_color}{z_str}" if z_color else z_str
+        lc_display = f"{lc_color}{lc_str}" if lc_color else lc_str
+        sc_display = f"{sc_color}{sc_str}" if sc_color else sc_str
+
+        tf_label = {"30m": "M30", "5m": "M5", "1m": "M1"}.get(tf, tf)
+        lines.append(
+            f"📊 {tf_label} | Z: {z_display} | 长相关: {lc_display} | 短相关: {sc_display}"
+        )
+
+    return "\n".join(lines)
+
+
+def run_tv_cross_timeframe_analysis():
+    """运行 TradingView 跨周期分析（从 CDP 读取）"""
+    try:
+        # 添加 kanban 路径以复用 tv.py
+        kanban_path = Path(PROJECT_ROOT) / "kanban"
+        if str(kanban_path) not in sys.path:
+            sys.path.insert(0, str(kanban_path))
+
+        from src.tv import get_all_tv_indicators
+
+        # 获取三个时间周期的数据
+        data_m30 = get_all_tv_indicators(timeframe="30m")
+        data_m5 = get_all_tv_indicators(timeframe="5m")
+        data_m1 = get_all_tv_indicators(timeframe="1m")
+
+        # 检查是否有数据
+        if (
+            not data_m30.get("tabs")
+            and not data_m5.get("tabs")
+            and not data_m1.get("tabs")
+        ):
+            return "⚠️ 未获取到任何图表数据，请检查 TradingView CDP 连接"
+
+        # 按品种聚合数据
+        symbol_map = {}
+
+        for data, tf_key in [(data_m30, "30m"), (data_m5, "5m"), (data_m1, "1m")]:
+            for tab in data.get("tabs", []):
+                symbol = tab.get("symbol", "N/A")
+                if symbol not in symbol_map:
+                    symbol_map[symbol] = {
+                        "description": tab.get("description", ""),
+                    }
+
+                indicators = _extract_tv_indicators(tab.get("studies", []))
+                symbol_map[symbol][tf_key] = {
+                    "quote": tab.get("quote", {}),
+                    "indicators": indicators,
+                }
+
+        # 格式化每个品种的报告
+        reports = []
+        for symbol, data in symbol_map.items():
+            report = _format_tv_symbol_report(symbol, data)
+            reports.append(report)
+
+        # 组合消息（限制最多10个品种）
+        if len(reports) > 10:
+            reports = reports[:10]
+            footer = f"\n\n（共 {len(symbol_map)} 个品种，显示前10个）"
+        else:
+            footer = ""
+
+        message = "\n\n".join(reports) + footer
+
+        # 发送飞书消息
+        success, resp = send_feishu(message)
+        if success:
+            return (
+                message
+                if len(message) < 2000
+                else message[:2000] + "\n\n（报告已发送至飞书）"
+            )
+        else:
+            return f"❌ 发送失败: {resp}"
+
+    except Exception as e:
+        import traceback
+
+        traceback.print_exc()
+        return f"❌ TradingView 数据不可用: {str(e)}"
+
+
 COMMANDS = {
     # 监控类
     "status": lambda: get_monitor_status(),
@@ -851,6 +1018,8 @@ COMMANDS = {
     "help": lambda: get_help_text(),
     # 多周期分析
     "多周期分析": lambda: run_multi_timeframe_analysis(),
+    # TradingView 跨周期分析
+    "tv": lambda: run_tv_cross_timeframe_analysis(),
 }
 
 
@@ -1084,21 +1253,25 @@ def tv_webhook():
                 return jsonify({"status": "ok", "order": order_payload})
         else:
             # 打印收到的原始数据用于调试
-            print(f"[TV-WEBHOOK] 收到数据: {json.dumps(data, ensure_ascii=False)[:500]}")
-            
+            print(
+                f"[TV-WEBHOOK] 收到数据: {json.dumps(data, ensure_ascii=False)[:500]}"
+            )
+
             title = data.get("title", "Webhook 警报")
             description = data.get("description", "")
             # 也检查其他常见字段
             ticker = data.get("ticker", "")
             reason = data.get("reason", "")
             message = data.get("message", "")
-            
+
             # 过滤掉 Z120 "无法获取当前价差" 警报（这类警报由 TradingView 频繁推送，无需转发到飞书）
             filter_text = "无法获取当前价差"
             if filter_text in (title + description + ticker + reason + message):
-                print(f"[TV-WEBHOOK] 过滤掉 Z120 警报: title={title}, ticker={ticker}, reason={reason}")
+                print(
+                    f"[TV-WEBHOOK] 过滤掉 Z120 警报: title={title}, ticker={ticker}, reason={reason}"
+                )
                 return jsonify({"status": "ok", "filtered": True})
-            
+
             success, result = send_feishu(f"{title}\n\n{description}")
             return jsonify({"status": "ok" if success else "error", "result": result})
 
@@ -1241,31 +1414,48 @@ def feishu_webhook():
                     if action and action != "UNKNOWN":
                         # ===== 订单级去重（60秒内相同订单，文件缓存支持多worker）=====
                         import time as _time, threading as _threading, json as _json
+
                         _DLOCK = _threading.Lock()
                         _DFILE = os.path.join(PROJECT_ROOT, ".order_dedup_cache.json")
-                        _ACN = {"BUY": "买入", "SELL": "卖出", "CLOSE": "平仓"}.get(action, action)
+                        _ACN = {"BUY": "买入", "SELL": "卖出", "CLOSE": "平仓"}.get(
+                            action, action
+                        )
                         _OK = f"{action}|{symbol}|{quantity}|{sec_type or ''}|{parsed_exchange or ''}"
                         _NOW = int(_time.time())
                         _ISDUP = False
                         with _DLOCK:
                             try:
-                                _C = _json.load(open(_DFILE, encoding="utf-8")) if os.path.exists(_DFILE) else {}
-                            except Exception:_C={}
-                            _C = {k:v for k,v in _C.items() if _NOW-v<120}
-                            if _OK in _C and _NOW-_C[_OK] < 60:
+                                _C = (
+                                    _json.load(open(_DFILE, encoding="utf-8"))
+                                    if os.path.exists(_DFILE)
+                                    else {}
+                                )
+                            except Exception:
+                                _C = {}
+                            _C = {k: v for k, v in _C.items() if _NOW - v < 120}
+                            if _OK in _C and _NOW - _C[_OK] < 60:
                                 _ISDUP = True
                             else:
                                 _C[_OK] = _NOW
-                                try:_json.dump(_C, open(_DFILE,"w",encoding="utf-8"))
-                                except:pass
+                                try:
+                                    _json.dump(_C, open(_DFILE, "w", encoding="utf-8"))
+                                except:
+                                    pass
                         if _ISDUP:
-                            _MSG = "\u26a0\ufe0f **重复订单已拦截**（60秒内相同订单）\n标的: " + symbol + " | 方向: " + _ACN + " | 数量: " + str(quantity)
+                            _MSG = (
+                                "\u26a0\ufe0f **重复订单已拦截**（60秒内相同订单）\n标的: "
+                                + symbol
+                                + " | 方向: "
+                                + _ACN
+                                + " | 数量: "
+                                + str(quantity)
+                            )
                             logger.info("[FEISHU] Duplicate: " + _OK + ", skip")
                             send_feishu(_MSG, chat_id)
-                            return jsonify({"status": "ok", "order": order_result or {}}), 200
+                            return jsonify(
+                                {"status": "ok", "order": order_result or {}}
+                            ), 200
                         # ================================================
-                        
-
 
                         try:
                             logger.info(
