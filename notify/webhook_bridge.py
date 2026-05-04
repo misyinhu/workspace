@@ -8,8 +8,8 @@ import os
 import sys
 
 # 设置代理（必须在OKX SDK导入之前）
-os.environ['HTTP_PROXY'] = 'http://127.0.0.1:7890'
-os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:7890'
+os.environ["HTTP_PROXY"] = "http://127.0.0.1:7890"
+os.environ["HTTPS_PROXY"] = "http://127.0.0.1:7890"
 
 # 首先应用 nest_asyncio patch（必须在导入 ib_insync 之前）
 try:
@@ -250,8 +250,65 @@ FEISHU_CONVERSATION_ID = feishu_config.get("chat_id", "")
 QUERY_ONLY = is_query_only()
 
 _token_cache = {"token": None, "expire": 0}
-Z120_SCRIPT = str(Path(PROJECT_ROOT) / "z120_monitor" / "z120_scheduler.py")
-Z120_PID_FILE = "/tmp/z120_monitor.pid"
+
+# TV Scheduler
+import threading
+import schedule
+import atexit
+
+_tv_scheduler_running = False
+_tv_scheduler_thread = None
+
+
+def _run_tv_scheduler():
+    """TV定时调度器线程"""
+    import schedule
+
+    def job():
+        logger.info("[TV-SCHEDULER] 定时执行 TV 分析...")
+        try:
+            result = run_tv_cross_timeframe_analysis()
+            logger.info(f"[TV-SCHEDULER] 结果: {result[:100] if result else 'None'}...")
+        except Exception as e:
+            logger.error(f"[TV-SCHEDULER] 错误: {e}")
+
+    # 每15分钟执行
+    schedule.every(15).minutes.do(job)
+
+    while _tv_scheduler_running:
+        schedule.run_pending()
+        time.sleep(10)
+
+
+def start_tv_scheduler():
+    """启动 TV 定时调度器"""
+    global _tv_scheduler_running, _tv_scheduler_thread
+
+    if _tv_scheduler_running:
+        return "TV 调度器已在运行中"
+
+    _tv_scheduler_running = True
+    _tv_scheduler_thread = threading.Thread(target=_run_tv_scheduler, daemon=True)
+    _tv_scheduler_thread.start()
+
+    # 注册退出时停止
+    atexit.register(stop_tv_scheduler)
+
+    return "🚀 TV 调度器已启动 (每15分钟执行)"
+
+
+def stop_tv_scheduler():
+    """停止 TV 定时调度器"""
+    global _tv_scheduler_running
+    _tv_scheduler_running = False
+    return "🛑 TV 调度器已停止"
+
+
+def get_tv_scheduler_status():
+    """获取 TV 调度器状态"""
+    if _tv_scheduler_running:
+        return "✅ TV 调度器运行中 (每15分钟)"
+    return "🔴 TV 调度器未运行"
 
 
 def get_python_cmd():
@@ -265,66 +322,6 @@ def get_python_cmd():
     except ImportError:
         # Windows 使用 "python"，Unix 使用 "python3"
         return "python" if sys.platform == "win32" else "python3"
-
-
-def get_z120_status():
-    """获取 Z120 监控状态"""
-    try:
-        result = subprocess.run(
-            ["pgrep", "-f", "z120_scheduler.py$"], capture_output=True, text=True
-        )
-        pids = [int(p) for p in result.stdout.strip().split("\n") if p]
-        if pids:
-            pid = pids[0]
-            return f"✅ Z120 监控运行中 (PID: {pid})"
-    except:
-        pass
-
-    return "🔴 Z120 监控未运行"
-
-
-def start_z120_monitor():
-    """启动 Z120 监控"""
-    status = get_z120_status()
-    if status.startswith("✅"):
-        return "Z120 监控已在运行中"
-
-    try:
-        subprocess.Popen(
-            [sys.executable, Z120_SCRIPT],
-            stdout=open("/tmp/z120_monitor.log", "a"),
-            stderr=open("/tmp/z120_monitor.err", "a"),
-        )
-        time.sleep(2)
-        return f"🚀 Z120 监控已启动\n\n{get_z120_status()}"
-    except Exception as e:
-        return f"❌ 启动失败: {e}"
-
-
-def stop_z120_monitor():
-    """停止 Z120 监控"""
-    stopped = False
-
-    try:
-        if os.name == "nt":
-            subprocess.run(["taskkill", "/F", "/IM", "python.exe"], capture_output=True)
-        else:
-            subprocess.run(["pkill", "-f", "z120_scheduler.py"], capture_output=True)
-        stopped = True
-    except:
-        pass
-
-    try:
-        with open(Z120_PID_FILE) as f:
-            pid = int(f.read().strip())
-        os.kill(pid, 9)
-        stopped = True
-    except:
-        pass
-
-    if stopped:
-        return "🛑 Z120 监控已停止"
-    return "Z120 监控未运行"
 
 
 def get_monitor_status():
@@ -673,11 +670,11 @@ def get_help_text():
 • /成交 - 查询成交记录
 
 **监控类:**
-• /status - 查看监控状态
+• /status - 查看 TV 调度器状态
 • /refresh - 刷新监控数据
-• /start - 启动监控
-• /stop - 停止监控
-• /log - 查看日志
+• /start - 启动 TV 调度器 (每15分钟)
+• /stop - 停止 TV 调度器
+• /log - 查看 TV 调度器状态
 
 **模式切换:**
 • /交易模式 - 切换到交易模式
@@ -891,7 +888,7 @@ def _format_tv_symbol_report(symbol, data_map):
     lines = [f"━━━ {symbol} ━━━", f"💰 价格: {price_str}", ""]
 
     # 按时间周期显示数据
-    for tf in ["30m", "5m", "1m"]:
+    for tf in ["15m", "5m", "1m"]:
         tf_data = data_map.get(tf, {})
         indicators = tf_data.get("indicators", {})
 
@@ -911,7 +908,7 @@ def _format_tv_symbol_report(symbol, data_map):
         lc_display = f"{lc_color}{lc_str}" if lc_color else lc_str
         sc_display = f"{sc_color}{sc_str}" if sc_color else sc_str
 
-        tf_label = {"30m": "M30", "5m": "M5", "1m": "M1"}.get(tf, tf)
+        tf_label = {"15m": "M15", "5m": "M5", "1m": "M1"}.get(tf, tf)
         lines.append(
             f"📊 {tf_label} | Z: {z_display} | 长相关: {lc_display} | 短相关: {sc_display}"
         )
@@ -930,13 +927,13 @@ def run_tv_cross_timeframe_analysis():
         from src.tv import get_all_tv_indicators
 
         # 获取三个时间周期的数据
-        data_m30 = get_all_tv_indicators(timeframe="30m")
+        data_m15 = get_all_tv_indicators(timeframe="15m")
         data_m5 = get_all_tv_indicators(timeframe="5m")
         data_m1 = get_all_tv_indicators(timeframe="1m")
 
         # 检查是否有数据
         if (
-            not data_m30.get("tabs")
+            not data_m15.get("tabs")
             and not data_m5.get("tabs")
             and not data_m1.get("tabs")
         ):
@@ -945,7 +942,7 @@ def run_tv_cross_timeframe_analysis():
         # 按品种聚合数据
         symbol_map = {}
 
-        for data, tf_key in [(data_m30, "30m"), (data_m5, "5m"), (data_m1, "1m")]:
+        for data, tf_key in [(data_m15, "15m"), (data_m5, "5m"), (data_m1, "1m")]:
             for tab in data.get("tabs", []):
                 symbol = tab.get("symbol", "N/A")
                 if symbol not in symbol_map:
@@ -994,13 +991,11 @@ def run_tv_cross_timeframe_analysis():
 
 COMMANDS = {
     # 监控类
-    "status": lambda: get_monitor_status(),
+    "status": lambda: get_tv_scheduler_status(),
     "refresh": trigger_refresh,
-    "start": lambda: start_z120_monitor(),
-    "stop": lambda: stop_z120_monitor(),
-    "log": lambda: execute_command(
-        "tail -30 /tmp/z120_monitor.log 2>/dev/null || echo 'No log'"
-    ),
+    "start": lambda: start_tv_scheduler(),
+    "stop": lambda: stop_tv_scheduler(),
+    "log": lambda: get_tv_scheduler_status(),
     # 模式切换
     "交易模式": lambda: (
         set_query_only(False) or globals().__setitem__("QUERY_ONLY", False),
@@ -1071,14 +1066,14 @@ def _submit_pair_trade(
 ):
     """同时下单多个标的（配对交易）"""
     from concurrent.futures import ThreadPoolExecutor
-    
+
     # 如果没有传入 actions，默认全部用 BUY
     if actions is None:
         actions = ["BUY"] * len(symbols)
-    
+
     results = []
     errors = []
-    
+
     def _trade_one(symbol, action):
         try:
             result = _submit_okx_order(
@@ -1093,14 +1088,16 @@ def _submit_pair_trade(
             return {symbol: result}
         except Exception as e:
             return {symbol: {"error": str(e)}}
-    
+
     # 并发执行所有订单
     with ThreadPoolExecutor(max_workers=len(symbols)) as executor:
-        futures = [executor.submit(_trade_one, sym, act) for sym, act in zip(symbols, actions)]
+        futures = [
+            executor.submit(_trade_one, sym, act) for sym, act in zip(symbols, actions)
+        ]
         for future in futures:
             result = future.result()
             results.append(result)
-    
+
     return {"pair_trade": results}
 
 
@@ -1124,17 +1121,17 @@ def tv_webhook():
             order_type = data.get(
                 "order_type", "market" if exchange == "OKX" else "MKT"
             )
-            
+
             # 支持配对交易：symbols 数组
             symbols = data.get("symbols", [])
             # 支持 actions 数组：每个标的独立方向
             actions = data.get("actions", [action] * len(symbols) if symbols else [])
-            
+
             if exchange == "OKX":
                 from datetime import datetime
 
                 time_str = datetime.now().strftime("%H:%M:%S")
-                
+
                 # 配对交易模式
                 if symbols and len(symbols) > 1:
                     # 构建方向描述
@@ -1143,10 +1140,12 @@ def tv_webhook():
                         act_cn = "买入" if act == "BUY" else "卖出"
                         dir_parts.append(f"{sym}: {act_cn}")
                     dir_str = " | ".join(dir_parts)
-                    leverage_info = f" {leverage if leverage else 3}x杠杆" if leverage else "3x杠杆"
+                    leverage_info = (
+                        f" {leverage if leverage else 3}x杠杆" if leverage else "3x杠杆"
+                    )
                     submit_msg = f"⏳ OKX 配对交易提交中\n{dir_str}\n杠杆: {leverage_info}\n模式: {margin_mode}\n时间: {time_str}"
                     send_feishu(submit_msg)
-                    
+
                     result = _submit_pair_trade(
                         symbols=symbols,
                         actions=actions,
@@ -1155,12 +1154,12 @@ def tv_webhook():
                         margin_mode=margin_mode,
                         order_type=order_type,
                     )
-                    
+
                     output_str = str(result)[:500] if result else ""
                     msg = f"🤖 OKX 配对交易信号\n{dir_str}\n保证金: {usd_amount} USD\n\n结果: {output_str}"
                     send_feishu(msg)
                     return jsonify({"status": "ok", "order": result})
-                
+
                 # 单标的下单
                 time_str = datetime.now().strftime("%H:%M:%S")
                 action_cn = "买入" if action == "BUY" else "卖出"

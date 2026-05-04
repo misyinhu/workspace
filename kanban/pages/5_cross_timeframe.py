@@ -48,7 +48,6 @@ def evaluate_signal(symbol, tf_data_map):
     )
     has_corr_break = all(c < 0.3 for _, c in corr_values) if corr_values else False
     has_corr_red = all(c < -0.5 for _, c in corr_values) if corr_values else False
-
     zscore_red = all(abs(z) >= 3 for _, z in zscore_values) if zscore_values else False
     avg_zscore = None
 
@@ -66,7 +65,7 @@ def evaluate_signal(symbol, tf_data_map):
             )
         elif all_extreme and all_same_sign and not has_corr_break:
             signal_score = 0
-            reasons.append(f"Z-Score共振但无相关性破裂，信号无效")
+            reasons.append("Z-Score共振但无相关性破裂，信号无效")
         elif abs(avg_zscore) >= 2 and has_corr_break:
             signal_score += 1
             reasons.append(f"Z-Score偏离({avg_zscore:.2f}) + 相关性破裂")
@@ -94,51 +93,59 @@ def evaluate_signal(symbol, tf_data_map):
 
 def render_cross_timeframe():
     st.markdown("### 📊 跨周期分析")
-    st.caption("自动获取 H1 / M15 / M3 指标，评估多周期共振信号")
+    st.caption("自动获取 M30 / M5 / M1 指标，评估多周期共振信号")
 
-    legend_markdown = """
-    **🎯 评分标准**
-    | 评分 | 条件 | 信号 |
-    |:---:|------|------|
-    | **+2** | Z全部同向(≥2) + 相关性破裂(<0.3) | 🟢买入/🔴卖出 |
-    | **+1** | Z偏离(≥2) + 相关性破裂 | 🟡关注 |
-    | **+1** | 相关性破裂但Z未极端 | 🟡关注 |
-    | **0** | Z共振但无相关性破裂 | ⚪无效 |
+    legend_score = """
+**🎯 评分标准**
+| 评分 | 条件 | 信号 |
+|:---:|------|------|
+| **+2** | Z全部同向(≥2) + 相关性破裂(<0.3) | 🟢买入/🔴卖出 |
+| **+1** | Z偏离(≥2) + 相关性破裂 | 🟡关注 |
+| **+1** | 相关性破裂但Z未极端 | 🟡关注 |
+| **0** | Z共振但无相关性破裂 | ⚪无效 |
 
-    **🔥 强烈入场**: 评分≥2 + Z全部≥3 + 相关性全部<-0.5  
-    **关键**: 相关性破裂(<0.3)是买入卖出信号的必要条件
+**🔥 强烈入场**: 评分≥2 + Z全部≥3 + 相关性全部<-0.5  
+**关键**: 相关性破裂(<0.3)是买入卖出信号的必要条件
+"""
 
-    **🎨 单元格颜色**
-    | Z-Score | 颜色 | 相关性 | 颜色 |
-    |:---:|:---:|------|:---:|
-    | &#124;Z&#124; ≥ 3 | 🔴红底白字 | corr < -0.5 | 🔴红底白字 |
-    | &#124;Z&#124; ≥ 2 | 🟡黄底黑字 | corr < 0 | 🟡黄底黑字 |
-    评分≥2的行：淡红背景高亮
-    """
+    legend_color = """
+**🎨 单元格颜色**
+| Z-Score | 颜色 | 相关性 | 颜色 |
+|:---:|:---:|------|:---:|
+| |Z| ≥ 3 | 🔴红底白字 | corr < -0.5 | 🔴红底白字 |
+| |Z| ≥ 2 | 🟡黄底黑字 | corr < 0 | 🟡黄底黑字 |
+评分≥2的行：淡红背景高亮
+"""
 
     st.markdown("#### 📋 图例说明")
-    st.markdown(legend_markdown)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(legend_score)
+    with col2:
+        st.markdown(legend_color)
 
-    if st.button("🔄 开始跨周期扫描", type="primary"):
+    st.markdown("---")
+
+    if st.button("🔄 开始跨周期扫描", type="primary", key="start_scan"):
         st.rerun()
 
-    with st.spinner("正在获取 H1 数据..."):
-        data_h1 = get_all_tv_indicators(timeframe="1h")
-    with st.spinner("正在获取 M15 数据..."):
-        data_m15 = get_all_tv_indicators(timeframe="15m")
-    with st.spinner("正在获取 M3 数据..."):
-        data_m3 = get_all_tv_indicators(timeframe="3m")
+    with st.spinner("正在获取 M30 数据..."):
+        data_m30 = get_all_tv_indicators(timeframe="30m")
+    with st.spinner("正在获取 M5 数据..."):
+        data_m5 = get_all_tv_indicators(timeframe="5m")
+    with st.spinner("正在获取 M1 数据..."):
+        data_m1 = get_all_tv_indicators(timeframe="1m")
 
-    if not data_h1 or not data_m15 or not data_m3:
+    if not data_m30 or not data_m5 or not data_m1:
         st.error("❌ 无法获取数据，请检查 TradingView CDP 连接")
         return
 
-    tabs_h1 = data_h1.get("tabs", [])
-    tabs_m15 = data_m15.get("tabs", [])
-    tabs_m3 = data_m3.get("tabs", [])
+    tabs_m30 = data_m30.get("tabs", [])
+    tabs_m5 = data_m5.get("tabs", [])
+    tabs_m1 = data_m1.get("tabs", [])
 
     symbol_map = {}
-    for tabs, tf in [(tabs_h1, "1h"), (tabs_m15, "15m"), (tabs_m3, "3m")]:
+    for tabs, tf in [(tabs_m30, "30m"), (tabs_m5, "5m"), (tabs_m1, "1m")]:
         for tab in tabs:
             symbol = tab.get("symbol", "N/A")
             if symbol not in symbol_map:
@@ -154,25 +161,24 @@ def render_cross_timeframe():
     if not symbol_map:
         st.warning("⚠️ 未扫描到任何图表")
         return
-    st.markdown("---")
 
     st.markdown(f"#### 📈 多周期信号矩阵 ({len(symbol_map)} 个品种)")
 
     rows = []
     for symbol, data in symbol_map.items():
-        h1_ind = data.get("1h", {}).get("indicators", {})
-        h1_quote = data.get("1h", {}).get("quote", {})
-        m15_ind = data.get("15m", {}).get("indicators", {})
-        m15_quote = data.get("15m", {}).get("quote", {})
-        m3_ind = data.get("3m", {}).get("indicators", {})
-        m3_quote = data.get("3m", {}).get("quote", {})
+        m30_ind = data.get("30m", {}).get("indicators", {})
+        m30_quote = data.get("30m", {}).get("quote", {})
+        m5_ind = data.get("5m", {}).get("indicators", {})
+        m5_quote = data.get("5m", {}).get("quote", {})
+        m1_ind = data.get("1m", {}).get("indicators", {})
+        m1_quote = data.get("1m", {}).get("quote", {})
 
-        price = h1_quote.get("close") or m15_quote.get("close") or m3_quote.get("close")
+        price = m30_quote.get("close") or m5_quote.get("close") or m1_quote.get("close")
 
         tf_data = {
-            "1h": {"indicators": h1_ind},
-            "15m": {"indicators": m15_ind},
-            "3m": {"indicators": m3_ind},
+            "30m": {"indicators": m30_ind},
+            "5m": {"indicators": m5_ind},
+            "1m": {"indicators": m1_ind},
         }
         signal = evaluate_signal(symbol, tf_data)
 
@@ -180,12 +186,10 @@ def render_cross_timeframe():
             {
                 "品种": symbol,
                 "价格": f"{price:.4f}" if price else "N/A",
-                "H1 Z": h1_ind.get("Z-Score"),
-                "H1相关": h1_ind.get("长期相关性"),
-                "M15 Z": m15_ind.get("Z-Score"),
-                "M15相关": m15_ind.get("长期相关性"),
-                "M3 Z": m3_ind.get("Z-Score"),
-                "M3相关": m3_ind.get("长期相关性"),
+                "M30 Z": m30_ind.get("Z-Score"),
+                "M30相关": m30_ind.get("长期相关性"),
+                "M5 Z": m5_ind.get("Z-Score"),
+                "M5相关": m5_ind.get("长期相关性"),
                 "信号": signal["action"],
                 "评分": signal["score"],
                 "依据": "; ".join(signal["reasons"])
@@ -231,7 +235,6 @@ def render_cross_timeframe():
             return "background-color: #ffeb3b; color: black"
         return ""
 
-    # 格式化函数（应用于显示）
     def format_zscore(val):
         z = parse_float(val)
         if z is None:
@@ -252,20 +255,20 @@ def render_cross_timeframe():
         return f"{c:.2f}"
 
     df_display = df.copy()
-    for col in ["H1 Z", "M15 Z", "M3 Z"]:
+    for col in ["M30 Z", "M5 Z", "M1 Z"]:
         df_display[col] = df_display[col].apply(format_zscore)
-    for col in ["H1相关", "M15相关", "M3相关"]:
+    for col in ["M30相关", "M5相关", "M1相关"]:
         df_display[col] = df_display[col].apply(format_corr)
 
     display_cols = [
         "品种",
         "价格",
-        "H1 Z",
-        "H1相关",
-        "M15 Z",
-        "M15相关",
-        "M3 Z",
-        "M3相关",
+        "M30 Z",
+        "M30相关",
+        "M5 Z",
+        "M5相关",
+        "M1 Z",
+        "M1相关",
         "信号",
         "评分",
         "依据",
@@ -273,8 +276,8 @@ def render_cross_timeframe():
 
     display_df = df_display[display_cols].copy()
 
-    zscore_cols = ["H1 Z", "M15 Z", "M3 Z"]
-    corr_cols = ["H1相关", "M15相关", "M3相关"]
+    zscore_cols = ["M30 Z", "M5 Z", "M1 Z"]
+    corr_cols = ["M30相关", "M5相关", "M1相关"]
 
     def style_cell(row):
         row_idx = row.name
@@ -298,11 +301,6 @@ def render_cross_timeframe():
     styled = display_df.style.apply(style_cell, axis=1)
 
     st.dataframe(styled, use_container_width=True, hide_index=True)
-
-    st.markdown("---")
-
-    if st.button("🔄 重新扫描"):
-        st.rerun()
 
 
 if __name__ == "__main__":

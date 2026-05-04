@@ -4,18 +4,57 @@ import json
 import subprocess
 import time
 import http.client
+from pathlib import Path
 
-TV_HOST = "100.82.238.11"
-TV_PORT = "9223"
-TV_CLI = "/Users/wang/.opencode/workspace/tradingview-mcp/src/cli/index.js"
-MULTI_WINDOW_SCRIPT = (
-    "/Users/wang/.opencode/workspace/tradingview-mcp/get_window_data.cjs"
+_TV_CLI = (
+    Path(__file__).parent.parent.parent.parent
+    / "tradingview-mcp"
+    / "src"
+    / "cli"
+    / "index.js"
 )
+_MULTI_WINDOW_SCRIPT = (
+    Path(__file__).parent.parent.parent.parent
+    / "tradingview-mcp"
+    / "get_window_data.cjs"
+)
+
+_config_paths = [
+    Path(__file__).parent.parent.parent / "config" / "settings.yaml",
+    Path("../config/settings.yaml"),
+    Path("../../config/settings.yaml"),
+]
+_config_path = next((p for p in _config_paths if p.exists()), _config_paths[0])
+
+import yaml
+
+try:
+    with open(_config_path, "r", encoding="utf-8") as f:
+        _cfg = yaml.safe_load(f) or {}
+except:
+    _cfg = {}
+
+_tv_cdp = _cfg.get("tv_cdp", {})
+_tv_url = _tv_cdp.get("url", "http://localhost")
+_tv_port = _tv_cdp.get("port", 9222)
+import re
+
+_match = re.match(r"https?://([^:/]+)", _tv_url)
+TV_HOST = _match.group(1) if _match else "localhost"
+TV_PORT = str(_tv_port)
 
 
 def run_tv_cmd(cmd_args, wait=0.5):
-    cmd = f"TV_HOST={TV_HOST} TV_PORT={TV_PORT} node {TV_CLI} {' '.join(cmd_args)}"
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=15)
+    cmd = f"TV_HOST={TV_HOST} TV_PORT={TV_PORT} node {_TV_CLI} {' '.join(cmd_args)}"
+    result = subprocess.run(
+        cmd,
+        shell=True,
+        capture_output=True,
+        text=True,
+        timeout=15,
+        encoding="utf-8",
+        errors="replace",
+    )
     if wait > 0:
         time.sleep(wait)
     if result.returncode == 0 and result.stdout:
@@ -65,7 +104,17 @@ def get_chart_targets():
 
 
 def get_all_tv_indicators(timeframe="5"):
-    tf_map = {"1m": "1", "5m": "5", "15m": "15", "30m": "30", "1h": "60", "4h": "240"}
+    tf_map = {
+        "1m": "1",
+        "5m": "5",
+        "15s": "15",
+        "15m": "15",
+        "30m": "30",
+        "1h": "60",
+        "3h": "180",
+        "4h": "240",
+        "1d": "1D",
+    }
     tf_code = tf_map.get(timeframe, "5")
 
     try:
@@ -83,11 +132,13 @@ def get_all_tv_indicators(timeframe="5"):
                 continue
 
             result = subprocess.run(
-                ["node", MULTI_WINDOW_SCRIPT, ws_url, tf_code],
+                ["node", str(_MULTI_WINDOW_SCRIPT), ws_url, tf_code],
                 capture_output=True,
                 text=True,
-                timeout=30,
-                cwd="/Users/wang/.opencode/workspace/tradingview-mcp",
+                timeout=60,
+                cwd=str(Path(__file__).parent.parent.parent.parent / "tradingview-mcp"),
+                encoding="utf-8",
+                errors="replace",
             )
 
             if result.returncode == 0 and result.stdout.strip():

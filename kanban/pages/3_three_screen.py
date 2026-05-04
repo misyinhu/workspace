@@ -6,7 +6,7 @@ import requests
 import time
 
 from src.config import QUANT_CORE_URL, CLIENT_ID
-from src.data import load_instruments_config
+from src.data import get_common_symbols
 
 st.set_page_config(page_title="三重滤网", page_icon="🔱", layout="wide")
 
@@ -63,33 +63,8 @@ def render_sidebar():
     return None, None
 
 
-def get_symbols_for_scan(use_common: bool, exchanges: list) -> list:
-    """获取扫描品种列表，格式: exchange:symbol 如 CME:MNQ"""
-    symbols = []
-
-    # 常用品种
-    if use_common:
-        instruments = load_instruments_config()
-        for inst in instruments:
-            symbol = inst.get("symbol", "")
-            source = inst.get("source", "")
-            exchange = inst.get("exchange", "").upper()
-
-            if source == "okx":
-                if symbol.endswith("-SWAP"):
-                    symbol = symbol.replace("-SWAP", "")
-                if "-" in symbol:
-                    symbols.append(f"OKX:{symbol}")
-            elif source == "ib":
-                if exchange in ["CME", "NYMEX", "COMEX", "CBOT"]:
-                    symbols.append(f"{exchange}:{symbol}")
-                elif exchange == "NASDAQ":
-                    symbols.append(f"NASDAQ:{symbol}")
-
-    return symbols
-
-
 def call_three_screen_api(
+    use_common: bool,
     exchanges: list,
     bar_size_m30: str,
     bar_size_m5: str,
@@ -98,16 +73,11 @@ def call_three_screen_api(
 ) -> dict:
     headers = {"X-Client-ID": CLIENT_ID}
 
-    # 根据交易所确定 data source
-    if "okx" in exchanges:
-        source = "okx"
-    elif "sse" in exchanges or "szse" in exchanges:
-        source = "tdxquant"
-    else:
-        source = "tdxquant"
+    # 获取常用品种
+    symbols = get_common_symbols() if use_common else []
 
     payload = {
-        "symbols": [],
+        "symbols": symbols,
         "exchanges": exchanges,
         "bar_size_m30": bar_size_m30,
         "bar_size_m5": bar_size_m5,
@@ -119,7 +89,7 @@ def call_three_screen_api(
 
     try:
         response = requests.post(
-            f"{QUANT_CORE_URL}/api/scan/three-screen?source={source}",
+            f"{QUANT_CORE_URL}/api/scan/three-screen",
             json=payload,
             headers=headers,
             timeout=30,
@@ -332,6 +302,7 @@ def main():
     st.empty()
 
     result = call_three_screen_api(
+        use_common=use_common,
         exchanges=exchanges,
         bar_size_m30=scan_params["bar_size_m30"],
         bar_size_m5=scan_params["bar_size_m5"],

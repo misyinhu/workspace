@@ -40,6 +40,28 @@ def load_instruments_config() -> list:
     return []
 
 
+def get_common_symbols() -> list:
+    """Get common symbols from instruments.yaml. Format: exchange:symbol"""
+    instruments = load_instruments_config()
+    symbols = []
+    for inst in instruments:
+        symbol = inst.get("symbol", "")
+        source = inst.get("source", "")
+        exchange = inst.get("exchange", "").upper()
+
+        if source == "okx":
+            if symbol.endswith("-SWAP"):
+                symbol = symbol.replace("-SWAP", "")
+            if "-" in symbol:
+                symbols.append(f"OKX:{symbol}")
+        elif source == "ib":
+            if exchange in ["CME", "NYMEX", "COMEX", "CBOT"]:
+                symbols.append(f"{exchange}:{symbol}")
+            elif exchange == "NASDAQ":
+                symbols.append(f"NASDAQ:{symbol}")
+    return symbols
+
+
 def get_source_for_symbol(symbol: str) -> str:
     """Determine data source for symbol."""
     instruments = load_instruments_config()
@@ -309,12 +331,24 @@ def fetch_from_history(symbol: str, source: str) -> dict:
                         rsi = _calculate_rsi(closes)
                         ema20 = _calculate_ema(closes, 20)
                         ema50 = _calculate_ema(closes, 50)
-                        ema200 = _calculate_ema(closes, 200) if len(closes) >= 200 else None
+                        ema200 = (
+                            _calculate_ema(closes, 200) if len(closes) >= 200 else None
+                        )
                         trend = _calculate_trend_from_prices(closes)
-                        bias_reasons = _calculate_bias_reason(closes, rsi, ema20, ema50, ema200)
+                        bias_reasons = _calculate_bias_reason(
+                            closes, rsi, ema20, ema50, ema200
+                        )
                         rsi_info = _calculate_rsi_info(closes)
                         momentum = _calculate_momentum(closes, rsi)
-                        change_pct = ((closes[-1] - closes[len(closes) // 2]) / closes[len(closes) // 2] * 100) if len(closes) >= 2 else 0
+                        change_pct = (
+                            (
+                                (closes[-1] - closes[len(closes) // 2])
+                                / closes[len(closes) // 2]
+                                * 100
+                            )
+                            if len(closes) >= 2
+                            else 0
+                        )
 
                         return tf, {
                             "close": latest.get("close", 0),
@@ -340,7 +374,9 @@ def fetch_from_history(symbol: str, source: str) -> dict:
                     error_data = response.json()
                     return tf, {"error": error_data.get("error", response.text)}
                 except Exception:
-                    return tf, {"error": f"HTTP {response.status_code}: {response.text[:200]}"}
+                    return tf, {
+                        "error": f"HTTP {response.status_code}: {response.text[:200]}"
+                    }
         except requests.exceptions.RequestException as e:
             return tf, {"error": f"请求错误: {str(e)}"}
         except Exception as e:
@@ -349,7 +385,9 @@ def fetch_from_history(symbol: str, source: str) -> dict:
 
     # Parallel fetch all timeframes
     with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = {executor.submit(_fetch_single_timeframe, tf): tf for tf in TIMEFRAMES}
+        futures = {
+            executor.submit(_fetch_single_timeframe, tf): tf for tf in TIMEFRAMES
+        }
         for future in as_completed(futures):
             tf, tf_data = future.result()
             if tf_data:
@@ -379,7 +417,7 @@ def fetch_from_history(symbol: str, source: str) -> dict:
 
 def fetch_multi_timeframe(symbol: str, source: str = "ib") -> dict:
     """Fetch multi-timeframe data for a symbol.
-    
+
     Args:
         symbol: Trading symbol (e.g., "2513.HK", "TSLA")
         source: Data source - "ib" for Interactive Brokers (default), "okx" for OKX
@@ -388,14 +426,18 @@ def fetch_multi_timeframe(symbol: str, source: str = "ib") -> dict:
 
 
 def fetch_pair_data(
-    symbol1: str, symbol2: str, bar: str = "1D", num: int = 100,
-    source1: str = "ib", source2: str = "ib"
+    symbol1: str,
+    symbol2: str,
+    bar: str = "1D",
+    num: int = 100,
+    source1: str = "ib",
+    source2: str = "ib",
 ) -> dict:
     """获取双品种数据用于套利分析
-    
+
     Args:
         symbol1: First trading symbol
-        symbol2: Second trading symbol  
+        symbol2: Second trading symbol
         bar: Timeframe (e.g., "1D", "5m")
         num: Number of bars to fetch
         source1: Data source for symbol1 (default "ib")

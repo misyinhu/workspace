@@ -1,11 +1,11 @@
 """Alert Center - TradingView 指标监控."""
 
 import streamlit as st
-from src.tv import get_all_tv_indicators
+from src.tv import get_all_tv_indicators, TV_HOST, TV_PORT
 
 # 可选周期
-TIMEFRAMES = ["1m", "5m", "30m", "4h"]
-DEFAULT_TF = "5m"
+TIMEFRAMES = ["1m", "5m", "15s", "30m", "3h"]
+DEFAULT_TF = "15s"
 
 
 def render_alert_center():
@@ -28,7 +28,7 @@ def render_alert_center():
     # 读取数据 (传入选择的周期)
     tv_data = get_all_tv_indicators(timeframe=selected_tf)
     if not tv_data:
-        st.warning("⚠️ 无法连接到 TradingView，请确保 CDP 已开启 (127.0.0.1:9222)")
+        st.warning(f"无法连接到 TradingView CDP ({TV_HOST}:{TV_PORT})，请检查配置")
         return
     tabs = tv_data.get("tabs", [])
     if not tabs:

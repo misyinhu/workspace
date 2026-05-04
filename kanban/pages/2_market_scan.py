@@ -6,7 +6,7 @@ import requests
 import time
 
 from src.config import QUANT_CORE_URL, CLIENT_ID
-from src.data import load_instruments_config
+from src.data import load_instruments_config, get_common_symbols
 
 st.set_page_config(page_title="市场扫描", page_icon="🔍", layout="wide")
 
@@ -128,47 +128,9 @@ def render_sidebar():
     return None, None
 
 
-def get_common_symbols() -> list:
-    """获取常用品种列表，格式: exchange:symbol 如 CME:MNQ"""
-    instruments = load_instruments_config()
-    symbols = []
-    for inst in instruments:
-        symbol = inst.get("symbol", "")
-        source = inst.get("source", "")
-        exchange = inst.get("exchange", "").upper()
-
-        if source == "okx":
-            if symbol.endswith("-SWAP"):
-                symbol = symbol.replace("-SWAP", "")
-            if "-" in symbol:
-                symbols.append(f"OKX:{symbol}")
-        elif source == "ib":
-            if exchange in ["CME", "NYMEX", "COMEX", "CBOT"]:
-                # IB 期货格式: CME:MNQ
-                symbols.append(f"{exchange}:{symbol}")
-            elif exchange == "NASDAQ":
-                # 美股格式: NASDAQ:AAPL
-                symbols.append(f"NASDAQ:{symbol}")
-    return symbols
-
-
 def call_market_scan_api(params: dict) -> dict:
     """调用市场扫描 API"""
     headers = {"X-Client-ID": CLIENT_ID}
-
-    # 根据交易所确定 data source
-    exchanges = params.get("exchanges", [])
-    if exchanges:
-        if "okx" in exchanges:
-            source = "okx"
-        elif "sse" in exchanges or "szse" in exchanges:
-            source = "tdxquant"
-        elif "ib" in exchanges:
-            source = "ib"
-        else:
-            source = "okx"
-    else:
-        source = "okx"
 
     # 如果选择常用品种，获取品种列表
     if params.get("use_common"):
@@ -180,7 +142,7 @@ def call_market_scan_api(params: dict) -> dict:
 
     try:
         response = requests.post(
-            f"{QUANT_CORE_URL}/api/scan/market?source={source}",
+            f"{QUANT_CORE_URL}/api/scan/market",
             json=params,
             headers=headers,
             timeout=120,
