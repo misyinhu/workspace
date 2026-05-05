@@ -184,6 +184,7 @@ def _render_signal_table(df: pd.DataFrame, title: str):
         st.caption(f"暂无 {title}")
         return
 
+    color = "📈" if "做多" in title else "📉" if "做空" in title else "📊"
     st.subheader(f"{color} {title} ({len(df)} 个)")
 
     col_config = {

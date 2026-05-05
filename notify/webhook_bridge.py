@@ -328,7 +328,8 @@ def get_monitor_status():
     """获取监控状态（快速版 - 使用多标缓存）"""
     import yaml
 
-    z120_status = get_z120_status()
+    # z120 已废弃，z120_status 固定返回已停止
+    z120_status = "已停止"
 
     pairs_path = Path(PROJECT_ROOT) / "z120_monitor" / "config" / "pairs.yaml"
     try:
