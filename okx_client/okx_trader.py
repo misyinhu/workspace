@@ -12,9 +12,11 @@ import okx
 _version = getattr(okx, "__version__", "unknown")
 
 if _version.startswith("2."):
-    from okx.Account import AccountAPI
-    from okx.Trade import TradeAPI
-    from okx.MarketData import MarketAPI
+    from okx.api import Account, Trade, Market
+
+    AccountAPI = Account
+    TradeAPI = Trade
+    MarketAPI = Market
 else:
     from okx.account import Account
     from okx.trade import Trade
@@ -64,21 +66,9 @@ class OKXTrader:
         if not all([self.api_key, self.secret, self.passphrase]):
             raise ValueError(f"OKX 密钥未配置 (flag={flag})")
 
-        # 代理配置（OKX SDK 不读环境变量，必须显式传入）
-        proxy_url = os.environ.get('HTTPS_PROXY') or os.environ.get('HTTP_PROXY') or ''
-        if proxy_url:
-            # 去掉协议前缀，统一用 HTTP 代理格式
-            clean = proxy_url.replace('http://', '').replace('https://', '').rstrip('/')
-            proxies = {
-                'http': f'http://{clean}',
-                'https': f'http://{clean}',
-            }
-        else:
-            proxies = {}
-
-        self.account = AccountAPI(self.api_key, self.secret, self.passphrase, self.flag, proxies=proxies)
-        self.trade = TradeAPI(self.api_key, self.secret, self.passphrase, self.flag, proxies=proxies)
-        self.market = MarketAPI(proxies=proxies)
+        self.account = AccountAPI(self.api_key, self.secret, self.passphrase, self.flag)
+        self.trade = TradeAPI(self.api_key, self.secret, self.passphrase, self.flag)
+        self.market = MarketAPI()
 
     def set_leverage(self, inst_id: str, leverage: str, tdMode: str = "cross"):
         self.account.set_leverage(instId=inst_id, lever=leverage, mgnMode=tdMode)
