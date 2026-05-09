@@ -1,0 +1,116 @@
+//@version=5
+indicator("Spread Z-Score Divergence Strategy", overlay=true, precision=2)
+
+// === Inputs ===
+srcTrade    = input.symbol(defval="USATECM2026", title="交易品种")
+srcRef      = input.symbol(defval="USAINDM2026", title="参考品种")
+zEntry      = input.float(-1.5, "入场 Z-Score", minval=-3.0, maxval=-0.5)
+zExit       = input.float(0.0, "出场 Z-Score", minval=-1.0, maxval=2.0)
+lookback    = input.int(100, "Z-Score 计算窗口", minval=20, maxval=500)
+profitTarget = input.float(20.0, "目标盈利 (Spread 点数)", minval=5.0)
+minHoldBars = input.int(120, "最小持有 Bar 数 (15s=30min)", minval=20)
+
+// === Calculate Spread ===
+spread = request.security(srcTrade, "15", close) - request.security(srcRef, "15", close)
+mean   = ta.sma(spread, lookback)
+std    = ta.stdev(spread, lookback)
+zScore = (spread - mean) / std
+
+// === Divergence Detection ===
+// Bullish divergence: price makes lower low but indicator makes higher low
+priceLow    = ta.lowest(spread, 20)
+priceLow2   = ta.lowest(spread[20], 20)
+zLow        = ta.lowest(zScore, 20)
+zLow2       = ta.lowest(zScore[20], 20)
+bullDiv     = spread < priceLow2 and zScore > zLow2 and zLow2 < -1.0
+
+// Bearish divergence: price makes higher high but indicator makes lower high  
+priceHigh   = ta.highest(spread, 20)
+priceHigh2  = ta.highest(spread[20], 20)
+zHigh       = ta.highest(zScore, 20)
+zHigh2      = ta.highest(zScore[20], 20)
+bearDiv     = spread > priceHigh2 and zScore < zHigh2 and zHigh2 > 1.0
+
+// === Entry Signals ===
+longSignal  = (zScore <= zEntry or bullDiv) and not nz(pos[1])
+shortSignal = (zScore >= -zEntry or bearDiv) and not nz(pos[1])
+
+// === Position Management ===
+var int pos      = 0
+var float entrySpread = na
+var int entryBar  = 0
+var float peakProfit = 0.0
+var int initHold = 0
+
+pos := longSignal ? 1 : shortSignal ? -1 : pos
+
+if pos == 1 and longSignal
+    entrySpread := spread
+    entryBar := bar_index
+    peakProfit := 0.0
+    initHold := 0
+
+if pos == -1 and shortSignal
+    entrySpread := spread
+    entryBar := bar_index
+    peakProfit := 0.0
+    initHold := 0
+
+// Track peak profit
+pnl = pos == 1 ? spread - entrySpread : pos == -1 ? entrySpread - spread : 0.0
+peakProfit := pnl > peakProfit or pnl < 0 ? pnl : peakProfit
+
+// Minimum hold time check
+barsHeld   = bar_index - entryBar
+initHoldOk = barsHeld >= minHoldBars
+
+// Exit conditions
+exitLong   = (zScore >= zExit or pnl >= profitTarget) and initHoldOk
+exitShort  = (zScore <= -zExit or pnl >= profitTarget) and initHoldOk
+
+if exitLong and pos == 1
+    pos := 0
+    entrySpread := na
+
+if exitShort and pos == -1
+    pos := 0
+    entrySpread := na
+
+// === Visualization ===
+plot(pos == 1 ? spread : na, "多头价差", color.lime, linewidth=2)
+plot(pos == -1 ? spread : na, "空头价差", color.red, linewidth=2)
+plot(spread, "价差", color.orange, linewidth=1)
+plot(mean, "均值", color.gray, linewidth=1)
+
+// Z-Score thresholds
+plot(ta.rma(zScore, 20) + 1.5, "上轨", color.maroon, linestyle=plot.style_line, linewidth=1)
+plot(ta.rma(zScore, 20) - 1.5, "下轨", color.green, linestyle=plot.style_line, linewidth=1)
+plot(zScore, "Z-Score", color.blue, linewidth=1)
+
+// Entry markers
+plotshape(longSignal, "买入", location.bottom, shape.labelup, color.lime, size=size.small, text="BUY")
+plotshape(shortSignal, "卖出", location.top, shape.labeldown, color.red, size=size.small, text="SELL")
+
+// Divergence markers
+plotshape(bullDiv, "底背离", location.bottom, shape.circle, color.green, size=size.tiny, text="DIV")
+plotshape(bearDiv, "顶背离", location.top, shape.circle, color.red, size=size.tiny, text="DIV")
+
+// === Dashboard ===
+var table dash = table.new(position.top_right, 2, 5, color.gray)
+if barstate.islast
+    table.cell(dash, 0, 0, "Z-Score", bgcolor=color.gray)
+    table.cell(dash, 1, 0, str.tostring(zScore, "#.##"), bgcolor=zScore > 1.5 or zScore < -1.5 ? color.red : color.gray)
+    table.cell(dash, 0, 1, "价差", bgcolor=color.gray)
+    table.cell(dash, 1, 1, str.tostring(spread, "#.##"), bgcolor=color.gray)
+    table.cell(dash, 0, 2, "持仓", bgcolor=color.gray)
+    table.cell(dash, 1, 2, pos == 1 ? "多头" : pos == -1 ? "空头" : "空仓", bgcolor=pos == 1 ? color.green : pos == -1 ? color.red : color.gray)
+    table.cell(dash, 0, 3, "浮盈", bgcolor=color.gray)
+    table.cell(dash, 1, 3, str.tostring(pnl, "#.##"), bgcolor=pnl > 0 ? color.green : pnl < 0 ? color.red : color.gray)
+    table.cell(dash, 0, 4, "持有", bgcolor=color.gray)
+    table.cell(dash, 1, 4, str.tostring(barsHeld), bgcolor=initHoldOk and pos != 0 ? color.green : color.gray)
+
+// === Alert Conditions ===
+alertcondition(longSignal, "买入信号", "Z-Score 达到 {{plot(" + str.tostring(zEntry) + ")}} 或底背离")
+alertcondition(shortSignal, "卖出信号", "Z-Score 达到 {{plot(" + str.tostring(-zEntry) + ")}} 或顶背离")
+alertcondition(exitLong, "平多信号", "多头出场")
+alertcondition(exitShort, "平空信号", "空头出场")

@@ -1,0 +1,78 @@
+//@version=5
+indicator("USATECM2026 vs USAINDM2026 Spread Strategy", overlay=true, precision=4)
+
+// === Inputs ===
+srcTrade    = input.symbol(defval="USATECM2026", title="交易品种")
+srcRef      = input.symbol(defval="USAINDM2026", title="参考品种")
+tf          = input.timeframe("15s", title="时间周期")
+startHour   = input.int(8, "开始小时 (0-23)", minval=0, maxval=23)
+zEntry      = input.float(2.0, "入场 Z-Score", minval=0.5, maxval=5.0)
+zExit       = input.float(0.5, "出场 Z-Score", minval=0.1, maxval=2.0)
+lookback    = input.int(100, "计算窗口", minval=20, maxval=500)
+targetPts   = input.float(20.0, "目标盈利 (点数)", minval=1.0)
+
+// === Time Filter ===
+inWindow = hour(time(tf)) >= startHour
+
+// === Spread Calculation ===
+spread   = request.security(srcTrade, tf, close) - request.security(srcRef, tf, close)
+mean     = ta.sma(spread, lookback)
+std      = ta.stdev(spread, lookback)
+zScore   = (spread - mean) / std
+
+// === Signals ===
+longSignal  = zScore <= -zEntry and inWindow
+shortSignal = zScore >= zEntry and inWindow
+exitLong    = zScore >= -zExit
+exitShort   = zScore <= zExit
+
+// === Positions ===
+var int pos = 0
+var float entryPrice = na
+var float peakPrice = na
+var float drawdown = 0.0
+
+if longSignal and pos == 0
+    pos := 1
+    entryPrice := close
+    peakPrice := close
+
+if shortSignal and pos == 0
+    pos := -1
+    entryPrice := close
+    peakPrice := close
+
+// Trail stop / profit target
+if pos == 1
+    pnl = close - entryPrice
+    if pnl >= targetPts or exitLong
+        pos := 0
+        entryPrice := na
+
+if pos == -1
+    pnl = entryPrice - close
+    if pnl >= targetPts or exitShort
+        pos := 0
+        entryPrice := na
+
+// === Plot ===
+plot(pos == 1 ? close : na, "多头", color.lime, style=plot.style_flag, linewidth=2)
+plot(pos == -1 ? close : na, "空头", color.red, style=plot.style_flag, linewidth=2)
+plot(spread, "价差", color.orange, linewidth=1)
+plot(mean, "均值", color.gray, linewidth=1)
+
+// Z-Score labels
+plotshape(longSignal, "买入", location.belowbar, shape.labelup, color.lime, size=size.small, text="BUY")
+plotshape(shortSignal, "卖出", location.abovebar, shape.labeldown, color.red, size=size.small, text="SELL")
+plotshape(exitLong and pos == 1, "平多", location.abovebar, shape.labeldown, color.yellow, size=size.small, text="EXIT-L")
+plotshape(exitShort and pos == -1, "平空", location.belowbar, shape.labelup, color.yellow, size=size.small, text="EXIT-S")
+
+// Dashboard
+var table dash = table.new(position.top_right, 2, 3, color.gray)
+if barstate.islast
+    table.cell(dash, 0, 0, "Z-Score", bgcolor=color.gray)
+    table.cell(dash, 1, 0, str.tostring(zScore, "#.##"), bgcolor=zScore > 2 ? color.red : zScore < -2 ? color.lime : color.gray)
+    table.cell(dash, 0, 1, "部位", bgcolor=color.gray)
+    table.cell(dash, 1, 1, pos == 1 ? "多头" : pos == -1 ? "空头" : "空仓", bgcolor=pos == 1 ? color.green : pos == -1 ? color.red : color.gray)
+    table.cell(dash, 0, 2, "时间窗口", bgcolor=color.gray)
+    table.cell(dash, 1, 2, inWindow ? "✓" : "✗", bgcolor=inWindow ? color.green : color.red)

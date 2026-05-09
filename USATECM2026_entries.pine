@@ -1,0 +1,95 @@
+//@version=5
+indicator("Spread 买卖点标记", overlay=true, precision=2)
+
+// === 参数 ===
+srcTrade = input.symbol("USATECM2026", title="交易品种")
+srcRef   = input.symbol("USAINDM2026", title="参考品种")
+zEntry   = input.float(-1.5, "入场 Z-Score", minval=-3.0, maxval=-0.5)
+zExit    = input.float(0.0, "出场 Z-Score")
+lookback = input.int(100, "计算窗口", minval=20)
+profitTarget = input.float(20.0, "目标点数")
+minHold   = input.int(120, "最小持有bars")
+
+// === 计算 ===
+spread = request.security(srcTrade, "15", close) - request.security(srcRef, "15", close)
+mean   = ta.sma(spread, lookback)
+std    = ta.stdev(spread, lookback)
+zScore = (spread - mean) / std
+
+// === 背离检测 ===
+priceLow  = ta.lowest(spread, 20)
+zLow      = ta.lowest(zScore, 20)
+bullDiv   = spread < priceLow[20] and zScore > zLow[20] and zLow[20] < -1.0
+
+priceHigh = ta.highest(spread, 20)
+zHigh     = ta.highest(zScore, 20)
+bearDiv   = spread > priceHigh[20] and zScore < zHigh[20] and zHigh[20] > 1.0
+
+// === 入场信号 ===
+longSignal  = (zScore <= zEntry or bullDiv) and pos == 0
+shortSignal = (zScore >= -zEntry or bearDiv) and pos == 0
+
+// === 持仓管理 ===
+var int pos = 0
+var float entrySpread = na
+var int entryBar = 0
+
+pos := longSignal ? 1 : shortSignal ? -1 : pos
+
+if longSignal
+    entrySpread := spread
+    entryBar := bar_index
+
+if shortSignal
+    entrySpread := spread
+    entryBar := bar_index
+
+// === 出场 ===
+barsHeld = bar_index - entryBar
+initHoldOk = barsHeld >= minHold
+pnl = pos == 1 ? spread - entrySpread : pos == -1 ? entrySpread - spread : 0.0
+
+exitLong  = pos == 1 and ((zScore >= zExit or pnl >= profitTarget) and initHoldOk)
+exitShort = pos == -1 and ((zScore <= -zExit or pnl >= profitTarget) and initHoldOk)
+
+if exitLong or exitShort
+    pos := 0
+    entrySpread := na
+
+// === 绘图标记 ===
+plotshape(longSignal, "买入", location.bottom, shape.labelup, color.green, size=size.medium, text="BUY\n入场")
+plotshape(shortSignal, "卖出", location.top, shape.labeldown, color.red, size=size.medium, text="SELL\n入场")
+
+plotshape(exitLong, "平多", location.top, shape.labeldown, color.orange, size=size.small, text="EXIT\n平仓")
+plotshape(exitShort, "平空", location.bottom, shape.labelup, color.orange, size=size.small, text="EXIT\n平仓")
+
+// Z-Score 色块
+ bgcolor(zScore <= -2 ? color.new(color.red, 80) : zScore >= 2 ? color.new(color.green, 80) : na)
+
+// Dashboard
+var table dash = table.new(position.top_right, 2, 6, color.gray)
+if barstate.islast
+    table.cell(dash, 0, 0, "Z-Score", bgcolor=color.gray, text_colorxid=color.white)
+    table.cell(dash, 1, 0, str.tostring(zScore, "#.##"), bgcolor=zScore < -1.5 ? color.red : zScore > 1.5 ? color.green : color.gray)
+    table.cell(dash, 0, 1, "价差", bgcolor=color.gray)
+    table.cell(dash, 1, 1, str.tostring(spread, "#.##"))
+    table.cell(dash, 0, 2, "持仓", bgcolor=color.gray)
+    table.cell(dash, 1, 2, pos == 1 ? "多头" : pos == -1 ? "空头" : "空仓", bgcolor=pos == 1 ? color.green : pos == -1 ? color.red : color.gray)
+    table.cell(dash, 0, 3, "浮盈", bgcolor=color.gray)
+    table.cell(dash, 1, 3, str.tostring(pnl, "#.##"), bgcolor=pnl > 0 ? color.green : pnl < 0 ? color.red : color.gray)
+    table.cell(dash, 0, 4, "持有", bgcolor=color.gray)
+    table.cell(dash, 1, 4, str.tostring(barsHeld), bgcolor=initHoldOk ? color.green : color.gray)
+    table.cell(dash, 0, 5, "目标", bgcolor=color.gray)
+    table.cell(dash, 1, 5, str.tostring(profitTarget, "#.#"), bgcolor=pnl >= profitTarget ? color.green : color.gray)
+
+// Alerts
+alertcondition(longSignal, "买入", "Z-Score达到 {{plot(\"zEntry\")}} 或底背离")
+alertcondition(shortSignal, "卖出", "Z-Score达到 {{plot(\"-zEntry\")}} 或顶背离")
+alertcondition(exitLong, "平多", "多头出场")
+alertcondition(exitShort, "平空", "空头出场")
+
+// Plot Z-Score line
+plot(zScore, "Z", color.blue, linewidth=2)
+plot(mean, "均值", color.gray, linewidth=1)
+hline(1.5, "上轨", color.maroon, linestyle=hline.style_dashed)
+hline(-1.5, "下轨", color.green, linestyle=hline.style_dashed)

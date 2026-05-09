@@ -70,11 +70,30 @@ def get_secrets():
     return EnvSecrets()
 
 
+def _get_okx_creds() -> tuple:
+    """根据 flag 返回对应的 OKX 凭证"""
+    flag = get_okx_flag()
+    prefix = "OKX_SIM" if flag == "sim" else "OKX_LIVE"
+    secrets = get_secrets()
+    return (
+        secrets.get(f"{prefix}_API_KEY", ""),
+        secrets.get(f"{prefix}_SECRET_KEY", ""),
+        secrets.get(f"{prefix}_PASSPHRASE", ""),
+    )
+
 def get_okx_api_key() -> str:
-    return get_secrets().get("OKX_API_KEY", "")
+    return _get_okx_creds()[0]
 
 def get_okx_secret_key() -> str:
-    return get_secrets().get("OKX_SECRET_KEY", "")
+    return _get_okx_creds()[1]
 
 def get_okx_passphrase() -> str:
-    return get_secrets().get("OKX_PASSPHRASE", "")
+    return _get_okx_creds()[2]
+
+def get_okx_flag() -> str:
+    """获取 OKX 交易模式: sim 或 live"""
+    return config.get("okx", {}).get("flag", "sim")
+
+def get_okx_pairs() -> list:
+    """获取 OKX 交易对配置"""
+    return config.get("okx", {}).get("pairs", [])
