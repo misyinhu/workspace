@@ -6,29 +6,39 @@ from typing import Dict, Any
 
 # 外汇品种列表（真正的外汇对，使用 CASH 类型，交易所 IDEALPRO）
 FOREX_SYMBOLS = {
-    'EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'NZDUSD', 'USDCAD',
-    'EURJPY', 'GBPJPY', 'EURGBP', 'EURAUD', 'GBPAUD',
+    "EURUSD",
+    "GBPUSD",
+    "USDJPY",
+    "USDCHF",
+    "AUDUSD",
+    "NZDUSD",
+    "USDCAD",
+    "EURJPY",
+    "GBPJPY",
+    "EURGBP",
+    "EURAUD",
+    "GBPAUD",
 }
 
 # 商品品种列表（贵金属等，使用 CMDTY 类型）
 CMDTY_SYMBOLS = {
-    'XAUUSD',  # 黄金 vs USD
-    'XAGUSD',  # 白银 vs USD
+    "XAUUSD",  # 黄金 vs USD
+    "XAGUSD",  # 白银 vs USD
 }
 
 TRADING_PATTERNS = [
     # ===== 平仓 CLOSE ===== (具体 pattern 在前，通用在后)
     (r"平掉(\S+?)(?:仓|位)$", "CLOSE"),
-    (r"平仓(\d+)(?:手|股)(\S+)$", "CLOSE"),          # 平仓2手GC
+    (r"平仓(\d+)(?:手|股)(\S+)$", "CLOSE"),  # 平仓2手GC
     (r"平仓([一二三四五六七八九十]+)(?:手|股)(\S+)$", "CLOSE"),  # 平仓一手GC
-    (r"平(\d+)(?:手|股)(\S+)$", "CLOSE"),             # 平2手GC
-    (r"平([一二三四五六七八九十]+)(?:手|股)(\S+)$", "CLOSE"),    # 平一手GC
+    (r"平(\d+)(?:手|股)(\S+)$", "CLOSE"),  # 平2手GC
+    (r"平([一二三四五六七八九十]+)(?:手|股)(\S+)$", "CLOSE"),  # 平一手GC
     (r"平仓(\d+)单元(\S+)$", "CLOSE"),
     (r"平仓(\d+)手(\S+)$", "CLOSE"),
     (r"平仓(\S+)(\d+)单元$", "CLOSE"),
     (r"平仓(\S+)(\d+)手$", "CLOSE"),
     (r"清仓$", "CLOSE"),
-    (r"平仓(\S+)$", "CLOSE"),                          # 平仓GC (全平)
+    (r"平仓(\S+)$", "CLOSE"),  # 平仓GC (全平)
     (r"平(\S+)$", "CLOSE"),
     # ===== 卖出 SELL =====
     (r"卖空(\d+)(?:手|股)(\S+)$", "SELL"),
@@ -38,12 +48,12 @@ TRADING_PATTERNS = [
     (r"做空(\S+)$", "SELL"),
     (r"卖(\d+)$", "SELL"),
     # ===== 买入 BUY ===== (具体在前，通用在后)
-    (r"买入(\d+)(?:手|股)(\S+)$", "BUY"),             # 买入1手GC
+    (r"买入(\d+)(?:手|股)(\S+)$", "BUY"),  # 买入1手GC
     (r"买入([一二三四五六七八九十]+)(?:手|股)(\S+)$", "BUY"),  # 买入一手GC
     (r"做多(\d+)(?:手|股)(\S+)$", "BUY"),
     (r"做多([一二三四五六七八九十]+)(?:手|股)(\S+)$", "BUY"),
     (r"买(\d+)(?:手|股)(\S+)$", "BUY"),
-    (r"买([一二三四五六七八九十]+)(?:手|股)(\S+)$", "BUY"),    # 买一手GC
+    (r"买([一二三四五六七八九十]+)(?:手|股)(\S+)$", "BUY"),  # 买一手GC
     (r"买入(\d+)单元(\S+)$", "BUY"),
     (r"做多(\d+)单元(\S+)$", "BUY"),
     (r"买入(\S+)(\d+)单元$", "BUY"),
@@ -70,11 +80,11 @@ QUERY_PATTERNS = [
 def parse_trading_command(message: str) -> Dict[str, Any]:
     msg = message.strip()
     msg_lower = msg.lower()
-    
+
     for pattern in QUERY_PATTERNS:
         if re.search(pattern, msg_lower):
             return {"action": "QUERY", "raw": msg}
-    
+
     for pattern, action in TRADING_PATTERNS:
         match = re.search(pattern, msg_lower)
         if match:
@@ -83,7 +93,7 @@ def parse_trading_command(message: str) -> Dict[str, Any]:
             quantity = None
             symbol = None
             usd_amount = None
-            
+
             if "美元" in pattern:
                 for g in groups:
                     if g and g.isdigit():
@@ -93,7 +103,20 @@ def parse_trading_command(message: str) -> Dict[str, Any]:
                 if usd_amount:
                     result["usd_amount"] = usd_amount
             else:
-                cn_num_map = {"一":1,"二":2,"三":3,"四":4,"五":5,"六":6,"七":7,"八":8,"九":9,"十":10,"零":0, "百":100}
+                cn_num_map = {
+                    "一": 1,
+                    "二": 2,
+                    "三": 3,
+                    "四": 4,
+                    "五": 5,
+                    "六": 6,
+                    "七": 7,
+                    "八": 8,
+                    "九": 9,
+                    "十": 10,
+                    "零": 0,
+                    "百": 100,
+                }
                 for g in groups:
                     if g:
                         g_stripped = g.strip()
@@ -108,30 +131,41 @@ def parse_trading_command(message: str) -> Dict[str, Any]:
                                     quantity = num
                                     break
                         # 普通字符串（不是数字）-> symbol
-                        elif g_stripped and not any(c.isdigit() for c in g_stripped) and len(g_stripped) > 1:
+                        elif (
+                            g_stripped
+                            and not any(c.isdigit() for c in g_stripped)
+                            and len(g_stripped) > 1
+                        ):
                             symbol = g_stripped
-                        elif g_stripped and not any(cn in g_stripped for cn in cn_num_map):
+                        elif g_stripped and not any(
+                            cn in g_stripped for cn in cn_num_map
+                        ):
                             # single char like "一" or "G" - only assign to symbol if it's clearly not a number
                             if g_stripped not in cn_num_map:
                                 symbol = g_stripped
                 if quantity is not None:
                     result["quantity"] = quantity
-            
+
             if symbol:
                 symbol = symbol.upper().strip()
                 symbol = re.sub(r"(单元|手|股)$", "", symbol)
                 symbol = symbol.strip()
-                
-                if "-SWAP" not in symbol and any(k in symbol for k in ["DOGE", "ETH", "BTC"]):
+
+                if "-SWAP" not in symbol and any(
+                    k in symbol for k in ["DOGE", "ETH", "BTC"]
+                ):
                     symbol = symbol + "-USDT-SWAP"
                     result["exchange"] = "OKX"
                     result["sec_type"] = "SWAP"
                 else:
                     symbol_map = {
-                        "BTC": "BTC", "比特币": "BTC",
-                        "黄金": "GC", "黄金": "GC",
-                        "小纳指": "MNQ", "纳指": "NQ",
-                        "标普": "ES", "道指": "YM",
+                        "BTC": "BTC",
+                        "比特币": "BTC",
+                        "黄金": "GC",
+                        "小纳指": "MNQ",
+                        "纳指": "NQ",
+                        "标普": "ES",
+                        "道指": "YM",
                     }
                     for k, v in symbol_map.items():
                         if k in symbol:
@@ -143,11 +177,11 @@ def parse_trading_command(message: str) -> Dict[str, Any]:
                     elif symbol in FOREX_SYMBOLS:
                         result["sec_type"] = "CASH"
                         result["exchange"] = "IDEALPRO"
-                
+
                 result["symbol"] = symbol
-            
+
             return result
-    
+
     return {"action": "UNKNOWN", "raw": msg}
 
 
@@ -160,7 +194,7 @@ if __name__ == "__main__":
         "查看持仓",
         "今天天气怎么样",
     ]
-    
+
     for msg in test_cases:
         result = parse_trading_command(msg)
         print(f"{msg} -> {result}")
