@@ -1025,7 +1025,7 @@ def _submit_okx_order(
     quantity: float,
     usd_amount: float = None,
     leverage: int = None,
-    margin_mode: str = "cross",
+    margin_mode: str = "cash",
     order_type: str = "market",
 ):
     okx_trader = None
@@ -1042,16 +1042,23 @@ def _submit_okx_order(
             okx_trader.set_leverage(symbol, str(leverage), margin_mode)
 
         side = "buy" if action == "BUY" else "sell"
-        pos_side = "long" if action == "BUY" else "short"
-        td_mode = "cross" if margin_mode == "cross" else "isolated"
-        result = okx_trader.place_order(
-            inst_id=symbol,
-            side=side,
-            sz=str(quantity),
-            ord_type=order_type.lower(),
-            tdMode=td_mode,
-            posSide=pos_side,
-        )
+        td_mode = "cash" if margin_mode == "cash" else ("cross" if margin_mode == "cross" else "isolated")
+
+        # 现货 (cash) 不需要 posSide，只有合约/杠杆交易需要
+        is_contract = td_mode in ("cross", "isolated")
+        pos_side = ("long" if action == "BUY" else "short") if is_contract else None
+
+        order_params = {
+            "inst_id": symbol,
+            "side": side,
+            "sz": str(quantity),
+            "ord_type": order_type.lower(),
+            "tdMode": td_mode,
+        }
+        if pos_side:
+            order_params["posSide"] = pos_side
+
+        result = okx_trader.place_order(**order_params)
         return result
     except Exception as e:
         return {"error": f"OKX 下单失败: {e}"}
@@ -1062,7 +1069,7 @@ def _submit_pair_trade(
     actions: list = None,
     usd_amount: float = None,
     leverage: int = 3,
-    margin_mode: str = "cross",
+    margin_mode: str = "cash",
     order_type: str = "market",
 ):
     """同时下单多个标的（配对交易）"""
@@ -1118,7 +1125,15 @@ def tv_webhook():
             exchange = data.get("exchange", "").upper()
             usd_amount = data.get("usd_amount")
             leverage = data.get("leverage")
-            margin_mode = data.get("margin_mode", "cross")
+            # 自动识别现货/合约：SWAP/PERP 为合约，其他为现货
+            requested_margin = data.get("margin_mode", None)
+            if requested_margin:
+                margin_mode = requested_margin
+            else:
+                # 根据交易对自动判断
+                symbol_upper = symbol.upper()
+                is_contract = any(x in symbol_upper for x in ["-SWAP", "-PERP", "-FUTURES", "-USD-"])
+                margin_mode = "cross" if is_contract else "cash"
             order_type = data.get(
                 "order_type", "market" if exchange == "OKX" else "MKT"
             )

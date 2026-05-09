@@ -26,6 +26,9 @@ else:
     TradeAPI = Trade
     MarketAPI = Market
 
+# Map YAML flag value to SDK flag number
+_SDK_FLAG_MAP = {"sim": "1", "live": "2"}
+
 
 def _load_config():
     for p in [
@@ -39,20 +42,36 @@ def _load_config():
 
 
 class OKXTrader:
-    def __init__(self, flag: str = "2"):
-        self.flag = flag
+    def __init__(self, flag: Optional[str] = None, proxies: Optional[dict] = None):
+        if proxies is None:
+            http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
+            https_proxy = os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")
+            if not http_proxy and not https_proxy:
+                proxies = {
+                    "http": "http://127.0.0.1:7890",
+                    "https": "http://127.0.0.1:7890",
+                }
+            elif http_proxy or https_proxy:
+                proxies = {
+                    "http": http_proxy or https_proxy,
+                    "https": https_proxy or http_proxy,
+                }
+            else:
+                proxies = {}
+        self.proxies = proxies
 
         env_key = os.getenv("OKX_API_KEY")
         if env_key:
             self.api_key = env_key
             self.secret = os.getenv("OKX_API_SECRET", "")
             self.passphrase = os.getenv("OKX_PASSPHRASE", "")
+            self.flag = os.getenv("OKX_FLAG", "1")
         else:
             config = _load_config()
             okx_config = config.get("okx", {})
-            mode_map = {"1": "live", "2": "sim"}
-            mode = mode_map.get(flag, "sim")
-            creds_list = okx_config.get(mode, [])
+            yaml_flag = flag or okx_config.get("flag", "sim")
+            self.flag = _SDK_FLAG_MAP.get(yaml_flag, "1")
+            creds_list = okx_config.get(yaml_flag, [])
             if creds_list:
                 creds = creds_list[0] if isinstance(creds_list, list) else creds_list
                 self.api_key = creds.get("apikey", "")
@@ -66,8 +85,12 @@ class OKXTrader:
         if not all([self.api_key, self.secret, self.passphrase]):
             raise ValueError(f"OKX 密钥未配置 (flag={flag})")
 
-        self.account = AccountAPI(self.api_key, self.secret, self.passphrase, self.flag)
-        self.trade = TradeAPI(self.api_key, self.secret, self.passphrase, self.flag)
+        self.account = AccountAPI(
+            self.api_key, self.secret, self.passphrase, self.flag
+        )
+        self.trade = TradeAPI(
+            self.api_key, self.secret, self.passphrase, self.flag
+        )
         self.market = MarketAPI()
 
     def set_leverage(self, inst_id: str, leverage: str, tdMode: str = "cross"):
@@ -90,13 +113,11 @@ class OKXTrader:
         after: Optional[str] = None,
         before: Optional[str] = None,
     ):
-        """获取历史K线 (2天前~3个月)"""
         return self.market.get_history_candlesticks(
             instId=inst_id, bar=bar, limit=str(limit), after=after, before=before
         )
 
     def get_ohlc(self, inst_id: str, bar: str = "1m", limit: int = 100):
-        """获取OHLC数据 [时间, 开盘, 最高, 最低, 收盘, 量]"""
         data = self.get_kline(inst_id, bar=bar, limit=limit)
         if data.get("code") == "0" and data.get("data"):
             return [
@@ -106,30 +127,11 @@ class OKXTrader:
                     "high": float(c[2]),
                     "low": float(c[3]),
                     "close": float(c[4]),
-                    "vol": float(c[5]),
+                    "volume": float(c[5]),
                 }
                 for c in data["data"]
             ]
         return []
-
-    def calculate_atr(
-        self, inst_id: str, period: int = 14, bar: str = "1h"
-    ) -> Optional[float]:
-        """计算ATR (Average True Range)"""
-        ohlc = self.get_ohlc(inst_id, bar=bar, limit=period + 1)
-        if len(ohlc) < period + 1:
-            return None
-
-        tr_values = []
-        for i in range(1, len(ohlc)):
-            high = ohlc[i]["high"]
-            low = ohlc[i]["low"]
-            prev_close = ohlc[i - 1]["close"]
-
-            tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
-            tr_values.append(tr)
-
-        return sum(tr_values) / len(tr_values)
 
     def place_order(
         self,
@@ -138,7 +140,7 @@ class OKXTrader:
         sz: str,
         ord_type: str = "market",
         tdMode: str = "cash",
-        posSide: str = None,
+        posSide: Optional[str] = None,
     ):
         params = {
             "instId": inst_id,
@@ -161,16 +163,11 @@ class OKXTrader:
         position_value = usd_amount * leverage
         doge_qty = position_value / last_price
         contract_size = 1000
-        contracts = doge_qty / contract_size
-        lot_size = 0.01
-        contracts = round(contracts / lot_size) * lot_size
-        if contracts < lot_size:
-            contracts = lot_size
-        return contracts
+        qty = round(doge_qty / contract_size) * contract_size
+        return max(qty, float(ticker["data"][0].get("minSz", 1)))
 
-    def cancel_order(self, inst_id: str, ord_id: str):
-        return self.trade.set_cancel_order(instId=inst_id, ordId=ord_id)
+    def close_position(self, inst_id: str, posSide: str = "long"):
+        return self.trade.close_position(instId=inst_id, posSide=posSide)
 
-
-def get_client() -> "OKXTrader":
-    return OKXTrader()
+    def get_positions(self, inst_type: str = "SPOT"):
+        return self.account.get_positions(instType=inst_type)
