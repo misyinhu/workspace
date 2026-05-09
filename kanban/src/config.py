@@ -53,3 +53,28 @@ ARBITRAGE_DEFAULTS = {
     "rsi_divergence_threshold": 20,  # RSI 背离阈值
     "correlation_window": 20,  # 滚动相关性窗口
 }
+
+
+def get_secrets():
+    """从 streamlit secrets 读取敏感配置，fallback 到环境变量"""
+    try:
+        import streamlit as st
+        return st.secrets
+    except Exception:
+        pass
+    
+    # fallback 到环境变量
+    class EnvSecrets:
+        def get(self, key, default=""):
+            return os.getenv(key, default)
+    return EnvSecrets()
+
+
+def get_okx_api_key() -> str:
+    return get_secrets().get("OKX_API_KEY", "")
+
+def get_okx_secret_key() -> str:
+    return get_secrets().get("OKX_SECRET_KEY", "")
+
+def get_okx_passphrase() -> str:
+    return get_secrets().get("OKX_PASSPHRASE", "")
