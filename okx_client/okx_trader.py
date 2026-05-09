@@ -31,13 +31,15 @@ _SDK_FLAG_MAP = {"sim": "1", "live": "2"}
 
 
 def _load_config():
+    """从 settings.yaml 加载 OKX 配置"""
     for p in [
-        Path(__file__).parent / "config.yaml",
-        Path(__file__).parent.parent / "config" / "okx.yaml",
+        Path(__file__).parent.parent / "config" / "settings.yaml",
+        Path(__file__).parent.parent.parent / "config" / "settings.yaml",
     ]:
         if p.exists():
             with open(p, encoding="utf-8") as f:
-                return yaml.safe_load(f)
+                data = yaml.safe_load(f)
+                return data.get("okx", {}) if data else {}
     return {}
 
 
@@ -68,19 +70,38 @@ class OKXTrader:
             self.flag = os.getenv("OKX_FLAG", "1")
         else:
             config = _load_config()
-            okx_config = config.get("okx", {})
-            yaml_flag = flag or okx_config.get("flag", "sim")
+            yaml_flag = flag or config.get("flag", "sim")
             self.flag = _SDK_FLAG_MAP.get(yaml_flag, "1")
-            creds_list = okx_config.get(yaml_flag, [])
-            if creds_list:
-                creds = creds_list[0] if isinstance(creds_list, list) else creds_list
-                self.api_key = creds.get("apikey", "")
-                self.secret = creds.get("secretkey", "")
-                self.passphrase = creds.get("passphrase", "")
-            else:
-                self.api_key = ""
-                self.secret = ""
-                self.passphrase = ""
+            # 从 secrets.toml 读取凭证
+            prefix = "OKX_SIM" if yaml_flag == "sim" else "OKX_LIVE"
+            # 尝试从 streamlit secrets 或直接读取 secrets.toml
+            self.api_key = ""
+            self.secret = ""
+            self.passphrase = ""
+            
+            # 尝试 streamlit secrets (在 Streamlit 环境下)
+            try:
+                import streamlit as st
+                self.api_key = st.secrets.get(f"{prefix}_API_KEY", "")
+                self.secret = st.secrets.get(f"{prefix}_SECRET_KEY", "")
+                self.passphrase = st.secrets.get(f"{prefix}_PASSPHRASE", "")
+            except:
+                pass
+            
+            # 如果没有，尝试直接读取 secrets.toml
+            if not self.api_key:
+                for sp in [
+                    Path(__file__).parent.parent / ".streamlit" / "secrets.toml",
+                    Path(__file__).parent.parent.parent / ".streamlit" / "secrets.toml",
+                ]:
+                    if sp.exists():
+                        import toml
+                        secrets = toml.load(sp)
+                        self.api_key = secrets.get(f"{prefix}_API_KEY", "")
+                        self.secret = secrets.get(f"{prefix}_SECRET_KEY", "")
+                        self.passphrase = secrets.get(f"{prefix}_PASSPHRASE", "")
+                        if self.api_key:
+                            break
 
         if not all([self.api_key, self.secret, self.passphrase]):
             raise ValueError(f"OKX 密钥未配置 (flag={flag})")
