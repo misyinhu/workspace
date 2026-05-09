@@ -31,7 +31,7 @@
 |---|------|--------|------|---------|---------|
 | 1 | `get_z120_status()` 未定义 | P0 | 已废弃 | 2026-05-05 | 2026-05-09 |
 | 2 | `color` 变量未定义（3_three_screen.py:187） | P0 | Pending Re-test | 2026-05-05 | - |
-| 3 | 重复字典键 `"黄金"`（nl_parser.py:132） | P0 | Open | 2026-05-05 | - |
+| 3 | 重复字典键 `"黄金"`（nl_parser.py:132） | P0 | **Closed** | 2026-05-05 | 2026-05-09 |
 
 ---
 
@@ -52,11 +52,14 @@
 
 ---
 
-## Issue #3
+## Issue #3（Closed）
 
 **标题**：重复字典键 `"黄金"`（nl_parser.py:132）
-**状态**：Open
-**修复方案**：合并或移除重复键
+**状态**：Closed
+**关闭时间**：2026-05-09
+**验证方式**：
+1. `rg -n '黄金' notify/nl_parser.py` → 只有 1 处
+2. `ruff check notify/nl_parser.py` → All checks passed ✅
 
 ---
 
