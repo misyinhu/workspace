@@ -1042,7 +1042,11 @@ def _submit_okx_order(
             okx_trader.set_leverage(symbol, str(leverage), margin_mode)
 
         side = "buy" if action == "BUY" else "sell"
-        td_mode = "cash" if margin_mode == "cash" else ("cross" if margin_mode == "cross" else "isolated")
+        td_mode = (
+            "cash"
+            if margin_mode == "cash"
+            else ("cross" if margin_mode == "cross" else "isolated")
+        )
 
         # 现货 (cash) 不需要 posSide，只有合约/杠杆交易需要
         is_contract = td_mode in ("cross", "isolated")
@@ -1132,7 +1136,9 @@ def tv_webhook():
             else:
                 # 根据交易对自动判断
                 symbol_upper = symbol.upper()
-                is_contract = any(x in symbol_upper for x in ["-SWAP", "-PERP", "-FUTURES", "-USD-"])
+                is_contract = any(
+                    x in symbol_upper for x in ["-SWAP", "-PERP", "-FUTURES", "-USD-"]
+                )
                 margin_mode = "cross" if is_contract else "cash"
             order_type = data.get(
                 "order_type", "market" if exchange == "OKX" else "MKT"
@@ -1352,8 +1358,17 @@ def feishu_webhook():
                 content = json.loads(content_raw)
                 text = content.get("text", "").strip()
             except Exception as parse_err:
-                logger.info(f"[FEISHU] Content parse error: {parse_err}")
-                text = ""
+                # 如果不是 JSON，尝试直接作为文本处理（兼容旧版或测试环境）
+                logger.info(
+                    f"[FEISHU] Content parse error: {parse_err}, treating as plain text"
+                )
+                text = content_raw.strip()
+                if text.startswith("{") and text.endswith("}"):
+                    # 看起来像 JSON 但解析失败，可能是被转义的
+                    try:
+                        text = json.loads(text).get("text", text)
+                    except Exception:
+                        pass
 
             logger.info(f"[FEISHU] Message text: '{text}'")
 
@@ -1512,6 +1527,7 @@ def feishu_webhook():
                                     f"❌ 下单失败: {error_msg}\n请检查 IB Gateway",
                                     chat_id,
                                 )
+                                order_result = {"error": error_msg}
                             else:
                                 # 使用解析出的交易所，或根据品种类型推断
                                 if parsed_exchange:
@@ -1549,7 +1565,7 @@ def feishu_webhook():
 时间: {time_str}"""
                                 send_feishu(submit_msg, chat_id)
 
-                                # 后台提交订单
+                                # 后台提交订单并等待结果
                                 future = _submit_order_in_background(
                                     ib,
                                     actual_symbol,
@@ -1560,13 +1576,10 @@ def feishu_webhook():
                                     conId=actual_conId,
                                     close_position=is_close,
                                 )
-                                order_result = {
-                                    "status": "Submitted",
-                                    "symbol": symbol,
-                                    "action": action,
-                                    "quantity": quantity,
-                                    "exchange": exchange,
-                                }
+                                # 等待订单执行结果（同步等待后台线程完成）
+                                order_result = future.result(timeout=60)
+                                if order_result is None:
+                                    order_result = {"error": "Order timed out"}
                         except Exception as e:
                             err_str = tb_module.format_exc()
                             _debug(
